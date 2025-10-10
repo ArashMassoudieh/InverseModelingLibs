@@ -1,30 +1,26 @@
 /*
  * OpenHydroQual - Environmental Modeling Platform
  * Copyright (C) 2025 Arash Massoudieh
- * 
+ *
  * This file is part of OpenHydroQual.
- * 
+ *
  * OpenHydroQual is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or (at your
  * option) any later version.
- * 
+ *
  * If you use this file in a commercial product, you must purchase a
  * commercial license. Contact arash.massoudieh@enviroinformatics.co for details.
  */
 
-
-// Binary.cpp: implementation of the CBinary class.
-//
-//////////////////////////////////////////////////////////////////////
-
 #include "Binary.h"
 #include "math.h"
 #include <iostream>
+#include <stdexcept>
 #include "DistributionNUnif.h"
 #ifdef QT_version
 #include "qdebug.h"
-#endif // QT_version
+#endif
 
 using namespace std;
 
@@ -32,217 +28,229 @@ using namespace std;
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
+// Private helper method - centralizes initialization logic
+void CBinary::initialize(int n, int preci)
+{
+    nDigits = n;
+    precision = preci;
+    Digit.resize(nDigits);
+    sign = true;
+}
+
+// Default constructor - delegates to parameterized constructor
 CBinary::CBinary()
+    : CBinary(0, DEFAULT_PRECISION)
 {
-	nDigits = 0;
-	precision = 3;
-	Digit.resize(nDigits);
-	sign = true;
-
 }
 
+// Single parameter constructor - delegates to two-parameter constructor
 CBinary::CBinary(int n)
+    : CBinary(n, DEFAULT_PRECISION)
 {
-	nDigits = n;
-	precision = 3;
-	Digit.resize(nDigits);
-	sign = true;
-
 }
 
+// Primary constructor - all initialization happens here
 CBinary::CBinary(int n, int preci)
+    : nDigits(n)
+    , precision(preci)
+    , Digit(n)
+    , sign(true)
 {
-	nDigits = n;
-	precision = preci;
-	Digit.resize(nDigits);
-	sign = true;
-
 }
 
+// Copy constructor - use member initializer list
+CBinary::CBinary(const CBinary &B)
+    : nDigits(B.nDigits)
+    , precision(B.precision)
+    , Digit(B.Digit)
+    , sign(B.sign)
+{
+}
+
+// Destructor - default is fine (vector cleans itself up)
 CBinary::~CBinary()
 {
-
 }
 
-CBinary::CBinary(const CBinary &B)
+// Assignment operator - return reference for chaining, check self-assignment
+CBinary& CBinary::operator=(const CBinary &B)
 {
-	nDigits = B.nDigits;
-	precision = B.precision;
-	Digit.resize(nDigits);
-	Digit = B.Digit;
-	sign = B.sign;
+    if (this != &B) // Check for self-assignment
+    {
+        nDigits = B.nDigits;
+        precision = B.precision;
+        Digit = B.Digit;
+        sign = B.sign;
+    }
+    return *this;
 }
 
-CBinary CBinary::operator = (const CBinary &B)
+// Decode method - now const-correct
+double CBinary::decode(double minrange) const
 {
-	nDigits = B.nDigits;
-	precision = B.precision;
-	Digit.resize(nDigits);
-	Digit = B.Digit;
-
-	sign = B.sign;
-	return *this;
+    double sum = 0.0;
+    for (int i = nDigits - 1; i >= 0; i--)
+    {
+        if (Digit[i] == true)
+            sum += pow(2.0, nDigits - i - 1);
+    }
+    return sum / pow(10.0, precision) + minrange;
 }
 
-
-double CBinary::decode(double minrange)
-{
-
-	double sum=0;
-	for (int i=nDigits-1; i>=0; i--)
-	{
-		if (Digit[i] == true)
-			sum += pow(2.0,nDigits-i-1);
-	}
-
-	return sum/pow(10.0,precision) + minrange;
-}
-
-
+// Free function for encoding
 CBinary code(double x, double minrange, double maxrange, int precision)
 {
-	int n = static_cast<int>(log((maxrange-minrange)*pow(10.0,precision))/log(2.0)+1);
-	int xi = static_cast<int>((x-minrange)*pow(10.0,precision));
-	CBinary B(n);
-	B.precision = precision;
+    int n = static_cast<int>(log((maxrange - minrange) * pow(10.0, precision)) / log(2.0) + 1);
+    int xi = static_cast<int>((x - minrange) * pow(10.0, precision));
+    CBinary B(n, precision);  // Use two-parameter constructor
 
-	for (int i=0; i<n; i++)
-	{
-		if (xi%2 == 1)
-			B.Digit[B.nDigits - i-1] = true;
-		else
-			B.Digit[B.nDigits - i-1] = false;
-		xi = static_cast<int>(xi/2);
-	}
+    for (int i = 0; i < n; i++)
+    {
+        B[B.getNDigits() - i - 1] = (xi % 2 == 1);
+        xi = static_cast<int>(xi / 2);
+    }
 
-	return B;
+    return B;
 }
 
-CBinary CBinary::operator + (const CBinary &B1)
+// Addition operator - concatenation, now const
+CBinary CBinary::operator+(const CBinary &B1) const
 {
-	int n = nDigits + B1.nDigits;
-	CBinary B(n);
-	for (int i=0; i<n; i++)
-	{
-		if (i<nDigits)
-			B.Digit[i] = Digit[i];
-		else
-			B.Digit[i] = B1.Digit[i-nDigits];
-	}
+    int n = nDigits + B1.nDigits;
+    CBinary B(n);
 
-	return B;
+    for (int i = 0; i < n; i++)
+    {
+        if (i < nDigits)
+            B[i] = Digit[i];
+        else
+            B[i] = B1.Digit[i - nDigits];
+    }
+
+    return B;
 }
 
-CBinary CBinary::extract(int spoint, int epoint)
+// Extract substring
+CBinary CBinary::extract(int spoint, int epoint) const
 {
-	int n = epoint - spoint + 1;
-	CBinary B(n);
-	for (int i=0; i<n; i++)
-	{
-			B.Digit[i] = Digit[i+spoint];
-	}
+    if (spoint < 0 || epoint >= nDigits || spoint > epoint)
+        throw std::out_of_range("Invalid extract range");
 
-	return B;
+    int n = epoint - spoint + 1;
+    CBinary B(n);
 
+    for (int i = 0; i < n; i++)
+    {
+        B[i] = Digit[i + spoint];
+    }
+
+    return B;
 }
 
+// Subscript operator - safer version with bounds checking
 int& CBinary::operator[](unsigned int i)
 {
-    int *p = 0;
-    if (i<Digit.size())
-        return this->Digit[i];
-    else
-        return *p;
+    if (i >= Digit.size())
+        throw std::out_of_range("CBinary index out of range");
+    return Digit[i];
 }
 
+// Const version of subscript operator
+const int& CBinary::operator[](unsigned int i) const
+{
+    if (i >= Digit.size())
+        throw std::out_of_range("CBinary index out of range");
+    return Digit[i];
+}
+
+// Crossover - single point
 void cross(CBinary &B1, CBinary &B2, int p)
 {
-	CBinary BT1 = B1;
-	CBinary BT2 = B2;
-	for (int i=0; i<B1.nDigits; i++)
-	{
-		if (i < p)
-		{
-			B1[i] = BT1[i];
-			B2[i] = BT2[i];
-		}
-		else
-		{
-			B1[i] = BT2[i];
-			B2[i] = BT1[i];
-		}
-	}
+    CBinary BT1 = B1;
+    CBinary BT2 = B2;
 
+    for (int i = 0; i < B1.getNDigits(); i++)
+    {
+        if (i < p)
+        {
+            B1[i] = BT1[i];
+            B2[i] = BT2[i];
+        }
+        else
+        {
+            B1[i] = BT2[i];
+            B2[i] = BT1[i];
+        }
+    }
 }
 
+// Crossover - multiple points
 void cross(CBinary &B1, CBinary &B2, vector<int> p)
 {
-	CBinary BT1 = B1;
-	CBinary BT2 = B2;
-	for (int i=0; i<B1.nDigits; i++)
-	{
-        for (unsigned int j=1; j<p.size(); j++)
-        if (p[j-1]< i && i < p[j])
-		{
-			if (i%2==0)
-			{
-                ////qDebug()<<BT1[i];
+    CBinary BT1 = B1;
+    CBinary BT2 = B2;
 
-                B1[i] = BT1[i];
-				B2[i] = BT2[i];
-			}
-			else
-			{
-				B1[i] = BT2[i];
-				B2[i] = BT1[i];
-			}
-		}
-	}
+    for (int i = 0; i < B1.getNDigits(); i++)
+    {
+        for (unsigned int j = 1; j < p.size(); j++)
+        {
+            if (p[j - 1] < i && i < p[j])
+            {
+                if (i % 2 == 0)
+                {
+                    B1[i] = BT1[i];
+                    B2[i] = BT2[i];
+                }
+                else
+                {
+                    B1[i] = BT2[i];
+                    B2[i] = BT1[i];
+                }
+            }
+        }
+    }
 }
 
-
-
-
+// Crossover - two point
 void cross2p(CBinary &B1, CBinary &B2, int p1, int p2)
 {
-	CBinary BT1 = B1;
-	CBinary BT2 = B2;
-	for (int i=0; i<B1.nDigits; i++)
-	{
-		if (i < p1)
-		{
-			B1[i] = BT1[i];
-			B2[i] = BT2[i];
-		}
-		if ((i >= p1) && (i < p2))
-		{
-			B1[i] = BT2[i];
-			B2[i] = BT1[i];
-		}
-		if ( i >= p2)
-		{
-			B1[i] = BT1[i];
-			B2[i] = BT2[i];
-		}
+    CBinary BT1 = B1;
+    CBinary BT2 = B2;
 
-	}
-
+    for (int i = 0; i < B1.getNDigits(); i++)
+    {
+        if (i < p1)
+        {
+            B1[i] = BT1[i];
+            B2[i] = BT2[i];
+        }
+        else if (i >= p1 && i < p2)
+        {
+            B1[i] = BT2[i];
+            B2[i] = BT1[i];
+        }
+        else // i >= p2
+        {
+            B1[i] = BT1[i];
+            B2[i] = BT2[i];
+        }
+    }
 }
 
-void CBinary::show()
+// Show method - for debugging
+void CBinary::show() const
 {
-	for (int i=0; i<nDigits; i++)
-		cout<<Digit[i];
-	cout<<endl;
-
-
+    for (int i = 0; i < nDigits; i++)
+        cout << Digit[i];
+    cout << endl;
 }
 
+// Mutation
 void CBinary::mutate(double mu)
 {
-	for (int i=0; i<nDigits; i++)
-		if (GetRndUniF(0,1)<mu)
-			Digit[i] = !Digit[i];
-
-
+    for (int i = 0; i < nDigits; i++)
+    {
+        if (GetRndUniF(0, 1) < mu)
+            Digit[i] = !Digit[i];
+    }
 }
