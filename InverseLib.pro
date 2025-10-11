@@ -10,6 +10,8 @@ INCLUDEPATH += include/GA
 INCLUDEPATH += include/MCMC
 INCLUDEPATH += Utilities
 
+DEFINES += GSL
+
 SOURCES += \
         Utilities/Matrix.cpp \
         Utilities/Matrix_arma.cpp \
@@ -18,6 +20,10 @@ SOURCES += \
         Utilities/QuickSort.cpp \
         Utilities/Utilities.cpp \
         main.cpp \
+        observation.cpp \
+        parameter.cpp \
+        parameter_set.cpp \
+        polynomialmodel.cpp \
         src/GA/Binary.cpp \
         src/GA/Distribution.cpp \
         src/GA/DistributionNUnif.cpp \
@@ -42,7 +48,13 @@ HEADERS += \
     include/GA/DistributionNUnif.h \
     include/GA/GA.h \
     include/GA/GA.hpp \
-    include/GA/Individual.h
+    include/GA/Individual.h \
+    include/MCMC/MCMC.h \
+    include/MCMC/MCMC.hpp \
+    observation.h \
+    parameter.h \
+    parameter_set.h \
+    polynomialmodel.h
 
 
 linux {

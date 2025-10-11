@@ -17,47 +17,117 @@
 // MCMC.cpp : Defines the entry point for the console application.
 //
 
+// Standard library
+#include "MCMC.h"
 #include <vector>
-#include "NormalDist.h"
 #include <string>
+#include <iostream>
+#include <fstream>      // For file I/O operations
+#include <cmath>        // For exp, log, pow, fabs, sqrt, isnan
+#include <algorithm>    // For min, max
+#include <thread>       // For hardware_concurrency
+
+// Project headers
+#include "NormalDist.h"
+#include "Utilities.h"
+#include "parameter_set.h"
+#include "observation.h"
+
+// OpenMP for parallel processing
 #ifndef mac_version
 #include <omp.h>
 #endif
+
+// Qt GUI support (conditional)
 #ifdef Q_GUI_SUPPORT
 #include "runtimewindow.h"
+#include <QCoreApplication>  // For processEvents() to keep GUI responsive
+#include <QString>           // For QString::number() and string conversions
+#include <QDebug>            // For qDebug() logging
 #endif
-#include "Utilities.h"
-#include "Parameter_Set.h"
 
+// OpenBLAS configuration (platform-specific)
 #ifndef _WINDOWS
 #ifndef _MacOS
 extern "C" {
 #include <openblas_config.h>
+void openblas_set_num_threads(int);
 }
-#endif // !MacOS
-#endif // !windows
-
-
-#ifndef _WINDOWS
-#ifndef _MacOS
-extern "C" void openblas_set_num_threads(int);
 #endif
 #endif
 
-using namespace std;
-
+/**
+ * @brief Default constructor
+ *
+ * Creates an MCMC object with no model attached. User must set model pointer
+ * and configuration before running.
+ */
 template<class T>
-CMCMC<T>::CMCMC(void)
+CMCMC<T>::CMCMC()
+    : model(nullptr)
+    , parameters(nullptr)
+    , observations(nullptr)
+    , runtimeWindow(nullptr)
+    , acceptedCount(0.0)
+    , totalCount(0.0)
 {
+    // All members initialized in initializer list
 }
 
+/**
+ * @brief Destructor
+ *
+ * Cleans up dynamically allocated memory for parameter samples and statistics.
+ * Note: Does NOT delete model, parameters, or observations pointers as
+ * this class does not own them.
+ */
 template<class T>
-CMCMC<T>::~CMCMC(void)
+CMCMC<T>::~CMCMC()
 {
-	Params.clear();
-    logp1.clear();
-	logp.clear();
+    // Clear vectors to free memory
+    parameterSamples.clear();
+    logPosteriorTransformed.clear();
+    logPosterior.clear();
+
+    // Note: We don't delete model, parameters, observations, or runtimeWindow
+    // because this class doesn't own them - they're managed externally
 }
+
+/**
+ * @brief Constructor with model pointer
+ * @param system Pointer to the model to be calibrated (must not be null)
+ *
+ * Initializes MCMC with the given model, automatically extracts parameters
+ * and observations from the model, and sets up default configuration.
+ *
+ * @throws Does not throw, but will result in errors if system is null
+ *
+ * @example
+ * @code
+ * MyModel model;
+ * CMCMC<MyModel> mcmc(&model);
+ * @endcode
+ */
+template<class T>
+CMCMC<T>::CMCMC(T* system)
+    : model(system)
+    , parameters(nullptr)
+    , observations(nullptr)
+    , runtimeWindow(nullptr)
+    , acceptedCount(0.0)
+    , totalCount(0.0)
+{
+    // Input validation
+    if (!model)
+    {
+        last_error = "MCMC constructor: model pointer is null";
+        return;
+    }
+
+    // Initialize from model
+    InitializeFromModel();
+}
+
 
 template<class T>
 Parameter* CMCMC<T>::parameter(int i)
@@ -78,7 +148,7 @@ TimeSeriesSet<double> CMCMC<T>::model(vector<double> par)
     vector<TimeSeriesSet<double>> res;
 
 
-    T G1 = *Model;
+    T G1 = *model;
     G1.SetSilent(true);
     G1.SetRecordResults(false);
     G1.SetNumThreads(1);

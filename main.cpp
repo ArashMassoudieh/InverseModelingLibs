@@ -11,6 +11,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
+#include "GA.h"
+#include "MCMC.h"
 
 using namespace std;
 
