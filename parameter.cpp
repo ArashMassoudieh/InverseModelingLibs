@@ -146,3 +146,25 @@ void Parameter::SetPosteriorDistribution(const TimeSeries<double>& dist) {
 void Parameter::SetPercentile95(const TimeSeriesSet<double>& pct) {
     percentile95 = pct;
 }
+
+void Parameter::SetRange(double low, double high) {
+    range.low = low;
+    range.high = high;
+}
+
+void Parameter::SetName(const std::string& name) {
+    paramName = name;
+}
+
+void Parameter::SetRange(const Range& r) {
+    range = r;
+}
+
+void Parameter::SetPriorDistribution(const std::string& dist) {
+    priorDistribution = dist;
+}
+
+void Parameter::SetPriorParameters(double mean, double std) {
+    priorMean = mean;
+    priorStd = std;
+}

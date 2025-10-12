@@ -23,6 +23,7 @@
 #include "NormalDist.h"
 #include "GA.h"
 #include "Vector.h"
+#include "Matrix_arma.h"
 #include "TimeSeriesSet.h"
 
 class Observation;
@@ -347,6 +348,13 @@ public:
      * Computes percentile bands (e.g., 2.5%, 50%, 97.5%) for model outputs
      * based on posterior parameter distribution.
      */
+
+    /**
+     * @brief Calculate correlation matrix between parameters from MCMC samples
+     * @param burnin Number of burn-in samples to skip (default: use settings.burnout_samples)
+     * @return Correlation matrix [parameter x parameter]
+     */
+    CMatrix_arma CalculateParameterCorrelation(int burnin = -1);
 
     TimeSeriesSet<double> GetOutputPercentiles(TimeSeriesSet<double>& MCMCout);
 

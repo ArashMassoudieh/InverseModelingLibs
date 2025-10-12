@@ -28,7 +28,6 @@
 #include <thread>       // For hardware_concurrency
 
 // Project headers
-#include "NormalDist.h"
 #include "Utilities.h"
 #include "parameter_set.h"
 #include "observation.h"
@@ -265,6 +264,81 @@ void CMCMC<T>::SetParameters(const std::vector<double>& paramValues)
         model->SetParameterValue(i, paramValues[i]);
     }
 }
+
+/**
+ * @brief Access parameter by index
+ * @param i Parameter index
+ * @return Pointer to Parameter object, or nullptr if invalid
+ *
+ * Provides safe access to parameters with bounds checking.
+ *
+ * @example
+ * @code
+ * Parameter* param = mcmc.GetParameter(0);
+ * if (param) {
+ *     std::cout << "Parameter: " << param->GetName() << std::endl;
+ * }
+ * @endcode
+ */
+template<class T>
+Parameter* CMCMC<T>::GetParameter(int i)
+{
+    // Validate parameters pointer
+    if (!parameters)
+    {
+        last_error = "GetParameter(): parameters pointer is null";
+        return nullptr;
+    }
+
+    // Validate index range
+    if (i < 0 || i >= static_cast<int>(parameters->size()))
+    {
+        last_error = "GetParameter(): index " + std::to_string(i) + " out of range [0, "
+                     + std::to_string(parameters->size() - 1) + "]";
+        return nullptr;
+    }
+
+    // Return pointer to parameter
+    return (*parameters)[i];
+}
+
+/**
+ * @brief Access observation by index
+ * @param i Observation index
+ * @return Pointer to Observation object, or nullptr if invalid
+ *
+ * Provides safe access to observations with bounds checking.
+ *
+ * @example
+ * @code
+ * Observation* obs = mcmc.GetObservation(0);
+ * if (obs) {
+ *     std::cout << "Observation: " << obs->GetName() << std::endl;
+ * }
+ * @endcode
+ */
+template<class T>
+Observation* CMCMC<T>::GetObservation(int i)
+{
+    // Validate observations pointer
+    if (!observations)
+    {
+        last_error = "GetObservation(): observations pointer is null";
+        return nullptr;
+    }
+
+    // Validate index range
+    if (i < 0 || i >= static_cast<int>(observations->size()))
+    {
+        last_error = "GetObservation(): index " + std::to_string(i) + " out of range [0, "
+                     + std::to_string(observations->size() - 1) + "]";
+        return nullptr;
+    }
+
+    // Return pointer to observation
+    return &(observations->at(i));
+}
+
 /**
  * @brief Set a single MCMC configuration property by name
  * @param varname Property name (case-insensitive)
@@ -541,6 +615,67 @@ void CMCMC<T>::RunModelInPlace(T* modelPtr, const std::vector<double>& par)
     modelPtr->Solve();
 }
 
+
+/**
+ * @brief Initialize from model - common initialization code
+ *
+ * Extracted common initialization logic used by constructors.
+ * Sets up parameters, observations, and default settings.
+ */
+template<class T>
+void CMCMC<T>::InitializeFromModel()
+{
+    // Get parameters from model
+    parameters = &(model->Parameters());
+
+    // Get observations from model
+    observations = model->Observations();
+
+    // Validate we have parameters
+    if (!parameters || parameters->empty())
+    {
+        last_error = "InitializeFromModel: Model has no parameters";
+        return;
+    }
+
+    // Validate we have observations
+    if (!observations || observations->empty())
+    {
+        last_error = "InitializeFromModel: Model has no observations";
+        return;
+    }
+
+    // Set number of parameters in settings
+    settings.number_of_parameters = static_cast<unsigned int>(parameters->size());
+
+    // Initialize parameter indices (all parameters are estimated by default)
+    parameterIndices.clear();
+    for (unsigned int i = 0; i < settings.number_of_parameters; ++i)
+    {
+        parameterIndices.push_back(i);
+    }
+
+    // Set default output path if not set
+    if (fileInformation.outputpath.empty())
+    {
+        fileInformation.outputpath = model->OutputPath();
+    }
+
+    // Set default output filename if not set
+    if (fileInformation.outputfilename.empty())
+    {
+        fileInformation.outputfilename = fileInformation.outputpath + "mcmc_samples.txt";
+    }
+
+    // Set default detail filename if not set
+    if (fileInformation.detailfilename.empty())
+    {
+        fileInformation.detailfilename = fileInformation.outputpath + "mcmc_details.txt";
+    }
+
+    // Initialize applyToAll flags (all parameters apply to all by default)
+    applyToAll.resize(settings.number_of_parameters, true);
+}
 
 /**
  * @brief Initialize MCMC chains
@@ -1999,6 +2134,10 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
     }
 #endif
 
+    std::cout << "Generating " << settings.number_of_post_estimate_realizations
+              << " realizations from " << (MCMCout[0].size() - settings.burnout_samples)
+              << " post-burnout samples..." << std::endl;
+
     // Storage for all realizations
     std::vector<TimeSeriesSet<double>> realizedTimeSeries(observations->size());
     std::vector<TimeSeriesSet<double>> predictedPercentiles(observations->size());
@@ -2015,13 +2154,26 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
         unsigned int batchStart = batchIndex * numThreads;
         unsigned int batchSize = std::min(numThreads, numRealizations - batchStart);
 
-        // Create model copies for this batch
-        std::vector<T> modelCopies(batchSize);
+        // Storage for this batch's results
+        std::vector<std::vector<TimeSeries<double>>> batchResults(batchSize);
+        for (unsigned int j = 0; j < batchSize; ++j)
+        {
+            batchResults[j].resize(observations->size());
+        }
 
         // Configure OpenMP threading
 #ifndef NO_OPENMP
         omp_set_num_threads(numThreads);
 #endif
+
+        // Seed random number generator for each thread
+#pragma omp parallel
+        {
+            unsigned int seed = static_cast<unsigned int>(time(NULL))
+            ^ (omp_get_thread_num() + 1) * 48271  // Prime multiplier
+                ^ (batchIndex + 1) * 65537;           // Another prime
+            srand(seed);
+        }
 
         // Run models in parallel
 #pragma omp parallel for
@@ -2029,8 +2181,8 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
         {
             try
             {
-                // Create model copy
-                modelCopies[j] = *model;
+                // Create model copy OUTSIDE of getrandom call to avoid race conditions
+                T modelCopy = *model;
 
                 // Sample random parameters from posterior (skip burnout)
                 std::vector<double> sampledParameters =
@@ -2048,16 +2200,40 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
                     continue;
                 }
 
-                // Set parameters and run model
+                // Set parameters on the model copy
                 for (unsigned int i = 0; i < settings.number_of_parameters; ++i)
                 {
-                    modelCopies[j].SetParameterValue(i, sampledParameters[i]);
+                    modelCopy.SetParameterValue(i, sampledParameters[i]);
                 }
 
-                modelCopies[j].ApplyParameters();
-                modelCopies[j].SetSilent(true);
-                modelCopies[j].SetRecordResults(true);  // Need results for observations
-                modelCopies[j].Solve();
+                // Apply parameters and run model
+                modelCopy.ApplyParameters();
+                modelCopy.SetSilent(true);
+                modelCopy.SetRecordResults(true);  // Need results for observations
+                modelCopy.Solve();
+
+                // Extract results from THIS model copy's observations
+                std::vector<Observation>* modelObservations = modelCopy.Observations();
+
+                if (!modelObservations || modelObservations->size() != observations->size())
+                {
+#pragma omp critical
+                    {
+                        std::cerr << "ProduceRealizations: Warning - Model copy observations mismatch for realization "
+                                  << (batchStart + j) << std::endl;
+                    }
+                    continue;
+                }
+
+                // Store results from this realization
+                for (unsigned int i = 0; i < modelObservations->size(); ++i)
+                {
+                    Observation& obs = (*modelObservations)[i];
+                    if (obs.GetModeledTimeSeries())
+                    {
+                        batchResults[j][i] = *(obs.GetModeledTimeSeries());
+                    }
+                }
             }
             catch (const std::exception& e)
             {
@@ -2074,18 +2250,9 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
         {
             for (unsigned int i = 0; i < observations->size(); ++i)
             {
-                try
+                if (!batchResults[j][i].empty())
                 {
-                    Observation* obs = observation(i);
-                    if (obs && obs->GetModeledTimeSeries())
-                    {
-                        realizedTimeSeries[i].append(*(obs->GetModeledTimeSeries()));
-                    }
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << "ProduceRealizations: Error collecting results for observation "
-                              << i << ": " << e.what() << std::endl;
+                    realizedTimeSeries[i].append(batchResults[j][i]);
                 }
             }
         }
@@ -2098,7 +2265,6 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
             / static_cast<double>(numRealizations);
             runtimeWindow->SetProgress(progress);
 
-
             // Keep GUI responsive
             QCoreApplication::processEvents();
 
@@ -2108,9 +2274,15 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
                 runtimeWindow->AppendText("Realization generation stopped by user");
                 return;
             }
-
         }
 #endif
+
+        // Progress output to console
+        if ((batchIndex + 1) % std::max(1u, numBatches / 10) == 0 || batchIndex == numBatches - 1)
+        {
+            std::cout << "Completed " << (batchStart + batchSize) << "/" << numRealizations
+                      << " realizations" << std::endl;
+        }
     }
 
     // Use percentiles from settings, or default to 2.5%, 50%, 97.5%
@@ -2137,12 +2309,24 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
 
         std::string obsName = obs->GetName();
 
+        // Check if we have any realizations for this observation
+        if (realizedTimeSeries[i].seriesCount() == 0)
+        {
+            std::cerr << "ProduceRealizations: Warning - No realizations collected for "
+                      << obsName << ". Skipping." << std::endl;
+            continue;
+        }
+
+        std::cout << "Writing " << realizedTimeSeries[i].seriesCount()
+                  << " realizations for " << obsName << std::endl;
+
         // Write all realizations
         std::string realizationsFilename = fileInformation.outputpath
                                            + "Realizations_" + obsName + ".txt";
         try
         {
             realizedTimeSeries[i].write(realizationsFilename);
+            std::cout << "  Written to: " << realizationsFilename << std::endl;
         }
         catch (const std::exception& e)
         {
@@ -2170,6 +2354,7 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
         try
         {
             predictedPercentiles[i].write(percentilesFilename);
+            std::cout << "  Percentiles written to: " << percentilesFilename << std::endl;
         }
         catch (const std::exception& e)
         {
@@ -2188,6 +2373,12 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
                                   + std::to_string(observations->size()) + " observations.");
     }
 #endif
+
+    std::cout << "\n========================================" << std::endl;
+    std::cout << "Realizations complete!" << std::endl;
+    std::cout << "Generated " << numRealizations << " realizations" << std::endl;
+    std::cout << "For " << observations->size() << " observations" << std::endl;
+    std::cout << "========================================\n" << std::endl;
 }
 
 /**
@@ -2766,4 +2957,134 @@ void CMCMC<T>::WritePercentilesTable(const std::vector<CVector>& percentiles,
     }
 
     file.close();
+}
+
+/**
+ * @brief Get current acceptance rate
+ * @return Ratio of accepted proposals to total proposals (0.0 to 1.0)
+ *
+ * The acceptance rate measures how often the MCMC algorithm accepts
+ * new proposals. The optimal rate is typically around 23-25% for
+ * multivariate problems.
+ *
+ * @note Returns 0.0 if no proposals have been made yet
+ *
+ * @example
+ * @code
+ * double rate = mcmc.GetAcceptanceRate();
+ * std::cout << "Acceptance rate: " << (rate * 100.0) << "%" << std::endl;
+ * @endcode
+ */
+template<class T>
+double CMCMC<T>::GetAcceptanceRate() const
+{
+    if (totalCount == 0.0)
+    {
+        return 0.0;
+    }
+
+    return acceptedCount / totalCount;
+}
+
+
+/**
+ * @brief Calculate parameter correlation matrix from MCMC samples
+ * @param burnin Number of initial samples to skip
+ * @return Correlation matrix where element (i,j) is correlation between parameters i and j
+ *
+ * The correlation matrix is symmetric with 1's on the diagonal.
+ * Values near ±1 indicate strong linear correlation between parameters.
+ *
+ * Formula: corr(X,Y) = cov(X,Y) / (std(X) * std(Y))
+ */
+template<class T>
+CMatrix_arma CMCMC<T>::CalculateParameterCorrelation(int burnin)
+{
+    // Validate inputs
+    if (burnin < 0 || static_cast<size_t>(burnin) >= parameterSamples.size())
+    {
+        last_error = "CalculateParameterCorrelation: invalid burnin value";
+        std::cerr << last_error << std::endl;
+        return CMatrix_arma();
+    }
+
+    int nParams = settings.number_of_parameters;
+    int nSamples = parameterSamples.size() - burnin;
+
+    if (nSamples < 2)
+    {
+        last_error = "CalculateParameterCorrelation: insufficient samples after burnin";
+        std::cerr << last_error << std::endl;
+        return CMatrix_arma();
+    }
+
+    // Initialize correlation matrix
+    CMatrix_arma corrMatrix(nParams, nParams);
+
+    // Calculate means for each parameter
+    std::vector<double> means(nParams, 0.0);
+    for (int i = burnin; i < static_cast<int>(parameterSamples.size()); ++i)
+    {
+        for (int j = 0; j < nParams; ++j)
+        {
+            means[j] += parameterSamples[i][j];
+        }
+    }
+    for (int j = 0; j < nParams; ++j)
+    {
+        means[j] /= nSamples;
+    }
+
+    // Calculate standard deviations
+    std::vector<double> stddevs(nParams, 0.0);
+    for (int i = burnin; i < static_cast<int>(parameterSamples.size()); ++i)
+    {
+        for (int j = 0; j < nParams; ++j)
+        {
+            double diff = parameterSamples[i][j] - means[j];
+            stddevs[j] += diff * diff;
+        }
+    }
+    for (int j = 0; j < nParams; ++j)
+    {
+        stddevs[j] = std::sqrt(stddevs[j] / (nSamples - 1));
+    }
+
+    // Calculate correlation coefficients
+    for (int p1 = 0; p1 < nParams; ++p1)
+    {
+        for (int p2 = 0; p2 < nParams; ++p2)
+        {
+            if (p1 == p2)
+            {
+                // Diagonal: perfect correlation with self
+                corrMatrix(p1, p2) = 1.0;
+            }
+            else if (p2 > p1)
+            {
+                // Calculate covariance
+                double covariance = 0.0;
+                for (int i = burnin; i < static_cast<int>(parameterSamples.size()); ++i)
+                {
+                    double diff1 = parameterSamples[i][p1] - means[p1];
+                    double diff2 = parameterSamples[i][p2] - means[p2];
+                    covariance += diff1 * diff2;
+                }
+                covariance /= (nSamples - 1);
+
+                // Calculate correlation
+                double correlation = 0.0;
+                if (stddevs[p1] > 1e-10 && stddevs[p2] > 1e-10)
+                {
+                    correlation = covariance / (stddevs[p1] * stddevs[p2]);
+                }
+
+                // Matrix is symmetric
+                corrMatrix(p1, p2) = correlation;
+                corrMatrix(p2, p1) = correlation;
+            }
+        }
+    }
+
+    return corrMatrix;
 }

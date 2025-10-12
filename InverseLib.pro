@@ -15,6 +15,7 @@ DEFINES += GSL
 SOURCES += \
         Utilities/Matrix.cpp \
         Utilities/Matrix_arma.cpp \
+        Utilities/NormalDist.cpp \
         Utilities/Vector.cpp \
         Utilities/Vector_arma.cpp \
         Utilities/QuickSort.cpp \
@@ -36,8 +37,10 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 HEADERS += \
+    NormalDistributionModel.h \
     Utilities/Matrix.h \
     Utilities/Matrix_arma.h \
+    Utilities/NormalDist.h \
     Utilities/QuickSort.h \
     Utilities/TimeSeries.h \
     Utilities/TimeSeries.hpp \

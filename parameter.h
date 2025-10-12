@@ -109,6 +109,38 @@ public:
     // ========================================================================
 
     /**
+     * @brief Set parameter name
+     * @param name New parameter name
+     */
+    void SetName(const std::string& name);
+
+    /**
+     * @brief Set parameter range
+     * @param low Lower bound
+     * @param high Upper bound
+     */
+    void SetRange(double low, double high);
+
+    /**
+     * @brief Set parameter range using Range struct
+     * @param r Range structure
+     */
+    void SetRange(const Range& r);
+
+    /**
+     * @brief Set prior distribution type
+     * @param dist Distribution name ("uniform", "normal", "log-normal")
+     */
+    void SetPriorDistribution(const std::string& dist);
+
+    /**
+     * @brief Set prior mean and standard deviation
+     * @param mean Prior mean
+     * @param std Prior standard deviation
+     */
+    void SetPriorParameters(double mean, double std);
+
+    /**
      * @brief Set current parameter value
      * @param val New value
      *

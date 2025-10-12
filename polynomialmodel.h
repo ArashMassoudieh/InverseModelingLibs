@@ -30,6 +30,24 @@ public:
     // ========================================================================
 
     /**
+     * @brief Default constructor (required by MCMC)
+     *
+     * Creates an empty model with no parameters or observations.
+     * This is needed for MCMC's internal storage but should not
+     * be used directly by users.
+     */
+    PolynomialModel()
+        : polynomialDegree(0)  // ✅ Use the correct member variable name
+        , silent(false)
+        , recordResults(true)
+        , numThreads(1)
+        , solutionFailed(false)
+        , simulationDuration(0.0)
+    {
+        // Initialize with empty data - will be properly initialized when copied
+    }
+
+    /**
      * @brief Constructor
      * @param degree Polynomial degree (e.g., 2 for quadratic)
      * @param xValues X coordinates for observations

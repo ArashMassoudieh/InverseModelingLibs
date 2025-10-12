@@ -1,6 +1,5 @@
 // levenberg_marquardt.hpp
 
-#include "levenbergmarquardt.h"
 #include <cmath>
 #include <iostream>
 #include <iomanip>
