@@ -63,7 +63,7 @@ public:
      * @brief Get objective function value (SSE)
      * @return Sum of squared errors
      */
-    double GetObjectiveFunctionValue() const;
+    double GetObjectiveFunctionValue();
 
     /**
      * @brief Set silent mode (suppress output)

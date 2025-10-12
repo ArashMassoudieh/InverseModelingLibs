@@ -19,6 +19,7 @@ SOURCES += \
         Utilities/Vector_arma.cpp \
         Utilities/QuickSort.cpp \
         Utilities/Utilities.cpp \
+        levenbergmarquardt.hpp \
         main.cpp \
         observation.cpp \
         parameter.cpp \
@@ -51,11 +52,16 @@ HEADERS += \
     include/GA/Individual.h \
     include/MCMC/MCMC.h \
     include/MCMC/MCMC.hpp \
+    levenbergmarquardt.h \
     observation.h \
     parameter.h \
     parameter_set.h \
     polynomialmodel.h
 
+
+QMAKE_CXXFLAGS += -fopenmp
+QMAKE_LFLAGS += -fopenmp
+LIBS += -fopenmp
 
 linux {
     #sudo apt-get install libblas-dev liblapack-dev

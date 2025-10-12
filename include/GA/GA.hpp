@@ -25,6 +25,13 @@
 #endif
 #include "qstring.h"
 #include "QDebug"
+#include <iostream>
+#include "Utilities.h"
+#include <random>
+#include "Matrix.h"
+#include "Vector.h"
+#include "parameter_set.h"
+#include "observation.h"
 
 
 #ifdef Q_GUI_SUPPORT
@@ -47,6 +54,8 @@ CGA<T>::CGA()
     , current_generation(0)
     , MaxFitness(0.0)
     , sumfitness(0.0)
+    , randomGenerator(std::random_device{}())  // Seed with random device
+    , uniformDistribution(0.0, 1.0)            // Uniform distribution [0, 1]
 #ifdef Q_GUI_SUPPORT
     , rtw(nullptr)
 #endif
@@ -59,6 +68,10 @@ CGA<T>::CGA()
     Ind.resize(GA_params.maxpop);
     Ind_old.resize(GA_params.maxpop);
     fitdist = CDistribution(GA_params.maxpop);
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<double> uniformDist(0.0, 1.0);
 }
 
 
@@ -81,7 +94,8 @@ void CGA<T>::initFromModel(T* model)
     GA_params.nParam = 0;
 
     // Extract parameters from model
-    const int modelParamCount = static_cast<int>(Model->Parameters().size());
+    Parameter_Set& parameters = Model->Parameters();
+    const int modelParamCount = static_cast<int>(parameters.size());
 
     for (int i = 0; i < modelParamCount; i++)
     {
@@ -92,23 +106,23 @@ void CGA<T>::initFromModel(T* model)
         const std::string priorDist = Model->Parameters()[i]->GetPriorDistribution();
         const bool isLogNormal = (priorDist == "lognormal");
 
+        Parameter::Range range = Model->Parameters()[i]->GetRange();
         if (isLogNormal)
         {
             // Store log10 of bounds for log-normal parameters
-            minval.push_back(log10(Model->Parameters()[i]->GetVal("low")));
-            maxval.push_back(log10(Model->Parameters()[i]->GetVal("high")));
-            loged.push_back(1);
+            minval.push_back(log10(range.low));
+            maxval.push_back(log10(range.high));
         }
         else
         {
             // Store bounds directly for linear parameters
-            minval.push_back(Model->Parameters()[i]->GetVal("low"));
-            maxval.push_back(Model->Parameters()[i]->GetVal("high"));
+            minval.push_back(range.low);
+            maxval.push_back(range.high);
             loged.push_back(0);
         }
 
         apply_to_all.push_back(false);
-        paramname.push_back(Model->Parameters().getKeyAtIndex(i));
+        paramname.push_back(Model->Parameters()[i]->GetName());
     }
 
     // Ensure population size is at least 1
@@ -162,6 +176,7 @@ void CGA<T>::initFromModel(T* model)
 template<class T>
 CGA<T>::CGA(const std::string& filename, const T& model)
     : Model(nullptr)
+    , Model_out(nullptr)
     , GA_params()
     , filenames()
     , numberOfThreads(20)
@@ -235,12 +250,15 @@ CGA<T>::CGA(const std::string& filename, const T& model)
 template<class T>
 CGA<T>::CGA(T* model)
     : Model(nullptr)
+    , Model_out(nullptr)
     , GA_params()
     , filenames()
     , numberOfThreads(20)
     , current_generation(0)
     , MaxFitness(0.0)
     , sumfitness(0.0)
+    , randomGenerator(std::random_device{}())  // Seed with random device
+    , uniformDistribution(0.0, 1.0)            // Uniform distribution [0, 1]
 #ifdef Q_GUI_SUPPORT
     , rtw(nullptr)
 #endif
@@ -338,6 +356,7 @@ void CGA<T>::setnumpop(int n)
 template<class T>
 CGA<T>::CGA(const CGA<T>& C)
     : Model(C.Model)
+    , Model_out(nullptr)
     , GA_params(C.GA_params)
     , filenames(C.filenames)
     , numberOfThreads(C.numberOfThreads)
@@ -589,22 +608,24 @@ void CGA<T>::assignfitnesses()
     write_to_detailed_GA("Creating model copies and applying parameters...");
 
     Models.clear();
-    Models.resize(GA_params.maxpop);
+    Models.reserve(GA_params.maxpop);  // Reserve space but don't construct
 
     for (int k = 0; k < GA_params.maxpop; k++)
     {
-        // Create model copy
-        Models[k] = *Model;
+        // Create model copy by copy construction
+        Models.push_back(*Model);
+
+        // Configure the model
         Models[k].SetSilent(true);
         Models[k].SetRecordResults(false);
-        Models[k].SetNumThreads(1);  // Each model uses 1 thread (we parallelize over population)
+        Models[k].SetNumThreads(1);
 
         // Apply parameters to model
         for (int i = 0; i < GA_params.nParam; i++)
         {
             Models[k].SetParameterValue(i, parameterSets[k][i]);
         }
-        Models[k].ApplyParameters();
+
     }
 
     // ========================================================================
@@ -660,9 +681,6 @@ void CGA<T>::assignfitnesses()
             std::vector<std::string>()
             );
 #endif
-
-        // Run simulation
-        Models[k].Solve();
 
         // Get fitness value
         Ind[k].actual_fitness = Models[k].GetObjectiveFunctionValue();
@@ -725,9 +743,23 @@ void CGA<T>::assignfitnesses()
         }
 
         // Copy detailed fitness measures
-        for (size_t i = 0; i < Models[k].fit_measures.size(); i++)
+        if (Ind[k].fit_measures.size() >= 3)  // Ensure space for MSE, R2, NSE
         {
-            Ind[k].fit_measures[i] = Models[k].fit_measures[i];
+            // Calculate fit measures for each observation
+            for (size_t obsIdx = 0; obsIdx < Models[k].ObservationsCount(); ++obsIdx)
+            {
+                Observation* obs = Models[k].observation(static_cast<int>(obsIdx));
+                if (obs)
+                {
+                    size_t baseIdx = obsIdx * 3;
+                    if (baseIdx + 2 < Ind[k].fit_measures.size())
+                    {
+                        Ind[k].fit_measures[baseIdx]     = obs->CalculateSSE();  // MSE
+                        Ind[k].fit_measures[baseIdx + 1] = obs->CalculateR2();   // R²
+                        Ind[k].fit_measures[baseIdx + 2] = obs->CalculateNSE();  // NSE
+                    }
+                }
+            }
         }
 
 #ifdef Debug_GA
@@ -744,8 +776,6 @@ void CGA<T>::assignfitnesses()
             );
 #endif
 
-        // Record evaluation metrics
-        epochs[k] = Models[k].EpochCount();
         evaluationTimes[k] = static_cast<double>(time(nullptr) - startTime);
 
         // Update progress (thread-safe)
@@ -790,7 +820,11 @@ void CGA<T>::assignfitnesses()
 
     // Store best model for output
     const int bestIndex = maxfitness();
-    Model_out = Models[bestIndex];
+    if (Model_out != nullptr)
+    {
+        delete Model_out;
+    }
+    Model_out = new T(Models[bestIndex]);
 
 #ifdef Q_GUI_SUPPORT
     if (rtw != nullptr)
@@ -861,7 +895,7 @@ void CGA<T>::crossover()
         const int offspring2Index = std::min(i + 1, GA_params.maxpop - 1);
 
         // Apply crossover with probability pcross
-        const double randomValue = GetRndUniF(0.0, 1.0);
+        const double randomValue = uniformDistribution(randomGenerator);
 
         if (randomValue < GA_params.pcross)
         {
@@ -951,7 +985,7 @@ void CGA<T>::crossoverRC()
         Ind[offspring2Index].SetParents(parent1Index, parent2Index);
 
         // Apply crossover with probability pcross
-        const double randomValue = GetRndUnif(0.0, 1.0);
+        const double randomValue = uniformDistribution(randomGenerator);
 
         if (randomValue < GA_params.pcross)
         {
@@ -1536,8 +1570,8 @@ int CGA<T>::optimize()
 
         write_to_detailed_GA("Assigning fitnesses ...");
         Models.clear();
-        Models.resize(GA_params.maxpop);
         assignfitnesses();
+
         write_to_detailed_GA("Assigning fitnesses done!");
 
         // --------------------------------------------------------------------
@@ -1742,8 +1776,8 @@ int CGA<T>::optimize()
     // ========================================================================
 
     write_to_detailed_GA("Performing final fitness evaluation...");
+    write_to_detailed_GA("Performing final fitness evaluation...");
     Models.clear();
-    Models.resize(GA_params.maxpop);
     assignfitnesses();
 
     fileOut = fopen(runFileName.c_str(), "a");
@@ -1828,18 +1862,15 @@ double CGA<T>::assignfitnesses(const std::vector<double>& parameters)
         modelInstance.SetParameterValue(i, parameters[i]);
     }
 
-    // Apply parameters to model
-    modelInstance.ApplyParameters();
-
-    // Solve the model
-    modelInstance.Solve();
-
     // Get objective function value
     const double objectiveFunctionValue = modelInstance.GetObjectiveFunctionValue();
 
     // Store results for later retrieval
-    Model_out = modelInstance;
-    Model_out.TransferResultsFrom(&modelInstance);
+    if (Model_out != nullptr)
+    {
+        delete Model_out;
+    }
+    Model_out = new T(modelInstance);
 
     // Return negative objective function (legacy convention)
     // Note: GA minimizes, so negative converts maximization to minimization

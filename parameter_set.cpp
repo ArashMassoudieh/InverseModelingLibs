@@ -117,3 +117,21 @@ int Parameter_Set::GetIndexByName(const std::string& name) const {
     }
     return -1;  // Not found
 }
+
+Parameter* Parameter_Set::operator[](const std::string& name) {
+    for (auto& param : parameters) {
+        if (param.GetName() == name) {
+            return &param;
+        }
+    }
+    return nullptr;  // Not found
+}
+
+const Parameter* Parameter_Set::operator[](const std::string& name) const {
+    for (const auto& param : parameters) {
+        if (param.GetName() == name) {
+            return &param;
+        }
+    }
+    return nullptr;  // Not found
+}

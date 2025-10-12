@@ -27,7 +27,6 @@
 
 class Observation;
 class ParameterSet;
-class Object;
 
 using namespace std;
 
@@ -151,10 +150,15 @@ public:
     // ============================================================================
 
     /**
-     * @brief Set MCMC configuration from object properties
-     * @param obj Object containing property-value pairs
+     * @brief Set all parameter values at once
+     * @param paramValues Vector of parameter values
+     *
+     * Sets all parameters to the given values. The size of paramValues
+     * must match the number of parameters in the model.
+     *
+     * @note This does NOT call model.ApplyParameters() - you must do that separately
      */
-    void SetParameters(Object *obj);
+    void SetParameters(const std::vector<double>& paramValues);
 
     /**
      * @brief Set a single configuration property
@@ -184,6 +188,26 @@ public:
     bool SetProperty(const string &varname, const string &value);
 
     /**
+     * @brief Access parameter by index (legacy)
+     * @param i Parameter index
+     * @return Pointer to Parameter object, or nullptr if invalid
+     *
+     * @deprecated Use GetParameter(i) instead
+     * @note Provided for backward compatibility
+     */
+    Parameter* parameter(int i);
+
+    /**
+     * @brief Access observation by index (legacy)
+     * @param i Observation index
+     * @return Pointer to Observation object, or nullptr if invalid
+     *
+     * @deprecated Use GetObservation(i) instead
+     * @note Provided for backward compatibility
+     */
+    Observation* observation(int i);
+
+    /**
      * @brief Set the runtime window for progress updates
      * @param _rtw Pointer to runtime window (can be nullptr)
      */
@@ -206,9 +230,10 @@ public:
      * @brief Initialize MCMC chains from specific parameter values
      * @param par Initial parameter values to use
      *
-     * Similar to initialize(bool) but starts from specified values.
+     * Similar to Initialize(bool) but starts from specified values with
+     * optional perturbation. Can use sensitivity-based perturbation scaling.
      */
-    void initialize(vector<double> par);
+    void InitializeFromParameters(const std::vector<double>& par);
 
     // ============================================================================
     // Core MCMC Operations
@@ -322,7 +347,8 @@ public:
      * Computes percentile bands (e.g., 2.5%, 50%, 97.5%) for model outputs
      * based on posterior parameter distribution.
      */
-    void GetOutputPercentiles(TimeSeriesSet<double> &MCMCout);
+
+    TimeSeriesSet<double> GetOutputPercentiles(TimeSeriesSet<double>& MCMCout);
 
     /**
      * @brief Calculate prior distribution for visualization
@@ -330,6 +356,19 @@ public:
      * @return TimeSeriesSet with prior distribution for each parameter
      */
     TimeSeriesSet<double> CalculatePriorDistribution(int n_bins);
+
+    /**
+     * @brief Write percentiles table to file
+     * @param percentiles Vector of CVector containing percentile values for each parameter
+     * @param columnLabels Parameter names (column headers)
+     * @param rowLabels Percentile labels (row headers: "0.025", "0.5", etc.)
+     * @param filename Output file path
+     */
+
+    void WritePercentilesTable(const std::vector<CVector>& percentiles,
+                                         const std::vector<std::string>& columnLabels,
+                                         const std::vector<std::string>& rowLabels,
+                                         const std::string& filename);
 
     // ============================================================================
     // Sensitivity Analysis
@@ -391,15 +430,16 @@ private:
     /**
      * @brief Perform MCMC steps with file output and progress updates
      * @param k Starting sample index
-     * @param nsamps Number of samples to generate
+     * @param numSamples Number of samples to generate
      * @param filename Output file path
-     * @param _rtw Runtime window for progress (can be nullptr)
-     * @return Success status
+     * @param runtimeWindow Runtime window for progress (can be nullptr)
+     * @return true on success, false if stopped by user
      *
      * Main sampling loop with adaptive perturbation, periodic file writes,
      * and GUI updates if runtime window provided.
      */
-    bool PerformSteps(int k, int nsamps, string filename, RunTimeWindow* _rtw = nullptr);
+    bool PerformSteps(int k, int numSamples, const std::string& filename,
+                      RunTimeWindow* runtimeWindow = nullptr);
 
     /**
      * @brief Perturb parameters to generate proposal
@@ -414,27 +454,58 @@ private:
      * @brief Calculate log posterior probability
      * @param par Parameter values
      * @param sample_number Sample index for logging
-     * @param out If true, store full model output
+     * @param saveOutput If true, save full model output
      * @return Log posterior probability (log prior + log likelihood)
      *
-     * Evaluates model at given parameters, computes log prior from parameter
-     * distributions, and log likelihood from objective function.
+     * Computes log posterior = log prior + log likelihood
+     * where log likelihood = -ObjectiveFunction
      */
-    double CalculateLogPosterior(vector<double> par, int sample_number, bool out = false);
+    double CalculateLogPosterior(const std::vector<double>& par,
+                                 int sample_number,
+                                 bool saveOutput = false);
 
     /**
-     * @brief Run model with given parameters
-     * @param par Parameter values
-     * @return Model outputs as TimeSeriesSet
-     */
-    TimeSeriesSet<double> RunModel(vector<double> par);
-
-    /**
-     * @brief Run model and store in provided model object
-     * @param Model1 Model object to run
+     * @brief Run model with given parameters (modifies provided model)
+     * @param modelPtr Pointer to model to run
      * @param par Parameter values to use
+     *
+     * @deprecated Internal helper method - prefer using RunModel() instead
      */
-    void RunModel(T *Model1, vector<double> par);
+    void RunModelInPlace(T* modelPtr, const std::vector<double>& par);
+
+    /**
+     * @brief Run model with given parameters and return predictions
+     * @param par Parameter values to use
+     * @return TimeSeriesSet with model predictions at observation times
+     *
+     * Creates a copy of the model, sets parameters, runs the simulation,
+     * and returns predictions at the same times as observed data.
+     *
+     * @note Model must implement GetPredictions() method
+     */
+
+    TimeSeriesSet<double> RunModel(const std::vector<double>& par);
+
+    /**
+     * @brief Initialize MCMC chains
+     * @param random If true, initialize parameters randomly; if false, use current values
+     *
+     * This method:
+     * 1. Clears the detail log file
+     * 2. Allocates storage for all samples
+     * 3. Calculates perturbation coefficients based on parameter ranges
+     * 4. Initializes starting values for each chain (random or current)
+     * 5. Evaluates initial log posterior for each chain
+     *
+     * For random initialization:
+     * - Uniform/normal parameters: sampled uniformly from [low, high]
+     * - Log-normal parameters: sampled uniformly in log-space
+     *
+     * For non-random initialization:
+     * - All chains start from current parameter values
+     */
+
+    void Initialize(bool random);
 
     // ============================================================================
     // Private Helper Methods

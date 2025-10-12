@@ -174,6 +174,28 @@ public:
      */
     int GetIndexByName(const std::string& name) const;
 
+    /**
+     * @brief Access parameter by name (mutable)
+     * @param name Parameter name to search for
+     * @return Pointer to Parameter, or nullptr if not found
+     *
+     * @example
+     * @code
+     * Parameter* k = params["conductivity"];
+     * if (k) {
+     *     k->SetValue(1.5);
+     * }
+     * @endcode
+     */
+    Parameter* operator[](const std::string& name);
+
+    /**
+     * @brief Access parameter by name (const)
+     * @param name Parameter name to search for
+     * @return Const pointer to Parameter, or nullptr if not found
+     */
+    const Parameter* operator[](const std::string& name) const;
+
 private:
     // ========================================================================
     // Private Data Members

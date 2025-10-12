@@ -86,6 +86,58 @@ double Observation::CalculateSSE() const {
     return sse;
 }
 
+double Observation::CalculateR2() const
+{
+    // Use minimum size to avoid out-of-bounds access
+    int n = std::min(observedData.size(), modeledData.size());
+
+    if (n == 0)
+    {
+        return 0.0;
+    }
+
+    // Calculate mean of observed values
+    double meanObserved = 0.0;
+    for (int i = 0; i < n; ++i)
+    {
+        meanObserved += observedData.getValue(i);
+    }
+    meanObserved /= static_cast<double>(n);
+
+    // Calculate SS_res (sum of squared residuals)
+    double ssRes = 0.0;
+    for (int i = 0; i < n; ++i)
+    {
+        double observed = observedData.getValue(i);
+        double modeled = modeledData.getValue(i);
+        double residual = observed - modeled;
+        ssRes += residual * residual;
+    }
+
+    // Calculate SS_tot (total sum of squares)
+    double ssTot = 0.0;
+    for (int i = 0; i < n; ++i)
+    {
+        double observed = observedData.getValue(i);
+        double deviation = observed - meanObserved;
+        ssTot += deviation * deviation;
+    }
+
+    // Avoid division by zero
+    if (ssTot == 0.0)
+    {
+        // All observed values are identical
+        // If residuals are also zero, perfect fit; otherwise, no fit
+        return (ssRes == 0.0) ? 1.0 : 0.0;
+    }
+
+    // R² = 1 - (SS_res / SS_tot)
+    double r2 = 1.0 - (ssRes / ssTot);
+
+    return r2;
+}
+
+
 double Observation::CalculateRMSE() const {
     int n = std::min(observedData.size(), modeledData.size());
 

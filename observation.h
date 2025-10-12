@@ -144,6 +144,16 @@ public:
     double CalculateSSE() const;
 
     /**
+     * @brief Calculate coefficient of determination (R²)
+     * @return R² value (1.0 = perfect fit, 0.0 = no better than mean)
+     *
+     * R² = 1 - (SS_res / SS_tot)
+     * where SS_res = sum of squared residuals
+     *       SS_tot = total sum of squares
+     */
+    double CalculateR2() const;
+
+    /**
      * @brief Calculate root mean squared error
      * @return RMSE = sqrt(SSE / n)
      *

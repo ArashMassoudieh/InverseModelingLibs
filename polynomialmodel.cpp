@@ -85,7 +85,8 @@ void PolynomialModel::Solve() {
     simulationDuration = std::chrono::duration<double>(end - start).count();
 }
 
-double PolynomialModel::GetObjectiveFunctionValue() const {
+double PolynomialModel::GetObjectiveFunctionValue() {
+    Solve();
     return observations[0].CalculateSSE();
 }
 
