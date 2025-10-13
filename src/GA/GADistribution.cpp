@@ -14,35 +14,35 @@
  */
 
 
-// Distribution.cpp: implementation of the CDistribution class.
+// Distribution.cpp: implementation of the CGADistribution class.
 //
 //////////////////////////////////////////////////////////////////////
 
-#include "Distribution.h"
+#include "GADistribution.h"
 #include "DistributionNUnif.h"
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
-CDistribution::CDistribution()
+CGADistribution::CGADistribution()
 {
 		
 }
 
-CDistribution::CDistribution(int nn)
+CGADistribution::CGADistribution(int nn)
 {
 	n = nn;
 	e.resize(n);
 	s.resize(n);
 }
 
-CDistribution::~CDistribution()
+CGADistribution::~CGADistribution()
 {
 	
 }
 
-CDistribution::CDistribution(const CDistribution &C)
+CGADistribution::CGADistribution(const CGADistribution &C)
 {
 	n = C.n;
 	e.resize(n);
@@ -56,7 +56,7 @@ CDistribution::CDistribution(const CDistribution &C)
 
 }
 
-CDistribution CDistribution::operator = (const CDistribution &C)
+CGADistribution CGADistribution::operator = (const CGADistribution &C)
 {
 	n = C.n;
 	e.resize(n);
@@ -71,7 +71,7 @@ CDistribution CDistribution::operator = (const CDistribution &C)
 
 }
 
-int CDistribution::GetRand()
+int CGADistribution::GetRand()
 {
 	double x = GetRndUniF(0,1);
 	int ii = 0;

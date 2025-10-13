@@ -67,37 +67,6 @@ CDistributionNUnif::~CDistributionNUnif()
 
 }
 
-void CDistributionNUnif::initializeGamma(double dx0, double dxmult, int nint, double r, double lambda)
-{
-
-	x[0] = 0;
-	y[0] = 0;
-	double x0 = 0;
-	double x1 = dx0;
-	for (int i=1; i<=n; i++)
-	{	y[i] = y[i-1];
-		x[i] = x1;
-		double dx = (x1-x0)/static_cast<int>(nint);
-		for (double xi = x0+dx/2; xi<=x1; xi+=dx)
-			y[i] += Gammapdf(xi,r,lambda)*dx;
-		if (i==1)
-		{
-			x0 = dx0;
-			x1 = dx0*dxmult;
-		}
-		else
-		{
-			x0 = x0*dxmult;
-			x1 = x0*dxmult;
-		}
-
-	}
-	set = true;
-	symetrical = false;
-
-}
-
-
 void CDistributionNUnif::initializeNormal(double dx0, double dxmult,int nint)
 {
 
@@ -126,11 +95,6 @@ void CDistributionNUnif::initializeNormal(double dx0, double dxmult,int nint)
 	set = true;
 	symetrical = true;
 
-}
-
-double Gammapdf(double x, double r, double lambda)
-{
-    return pow(lambda, r)*pow(x, r-1)*exp(-lambda*x)/calcGamma(r);
 }
 
 double NormalStdpdf(double x)

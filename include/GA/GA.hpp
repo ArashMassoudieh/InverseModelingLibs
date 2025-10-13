@@ -24,8 +24,10 @@
 #include <omp.h>
 #endif
 #ifdef Q_JSON_SUPPORT
-#include "qstring.h"
 #include "QDebug"
+#include <QString>
+#endif
+
 #include <iostream>
 #include "Utilities.h"
 #include <random>

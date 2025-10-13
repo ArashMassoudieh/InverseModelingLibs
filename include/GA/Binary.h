@@ -20,7 +20,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <iostream>
-
+#include <random>
 
 using namespace std;
 
@@ -188,6 +188,9 @@ public:
     void setPrecision(int preci) { precision = preci; }
 
 private:
+    std::mt19937 randomGenerator;
+    std::uniform_real_distribution<double> uniformDistribution;
+
     /// Default precision for encoding/decoding (3 decimal places)
     static constexpr int DEFAULT_PRECISION = 3;
 
@@ -272,6 +275,18 @@ void cross(CBinary &B1, CBinary &B2, vector<int> p);
 void cross2p(CBinary &B1, CBinary &B2, int p1, int p2);
 
 #endif // BINARY_H
+
+// Default constructor - delegates to parameterized constructor
+CBinary::CBinary()
+    : CBinary(0, DEFAULT_PRECISION)
+{
+}
+
+// Single parameter constructor - delegates to two-parameter constructor
+CBinary::CBinary(int n)
+    : CBinary(n, DEFAULT_PRECISION)
+{
+}
 
 // Primary constructor - all initialization happens here
 CBinary::CBinary(int n, int preci)
@@ -474,7 +489,7 @@ void CBinary::mutate(double mu)
 {
     for (int i = 0; i < nDigits; i++)
     {
-        if (GetRndUniF(0, 1) < mu)
+        if (uniformDistribution(randomGenerator) < mu)
             Digit[i] = !Digit[i];
     }
 }

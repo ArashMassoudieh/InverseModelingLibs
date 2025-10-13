@@ -18,20 +18,21 @@
 #pragma once
 #include <vector>
 
-using namespace std;
+#include <string>
 
-class CDistribution  
+class CGADistribution  
 {
 public:
-	CDistribution();
-	virtual ~CDistribution();
-	int n;
-	vector<double> s;
-	vector<double> e;
-    CDistribution(int nn);
-	CDistribution(const CDistribution &C);
-    CDistribution operator = (const CDistribution &C);
+    CGADistribution();
+    virtual ~CGADistribution();
+    int n;
+    std::vector<double> s;
+    std::vector<double> e;
+    CGADistribution(int nn);
+    CGADistribution(const CGADistribution &C);
+    CGADistribution operator = (const CGADistribution &C);
     int GetRand();
+    std::string name = "";
 
 };
 
