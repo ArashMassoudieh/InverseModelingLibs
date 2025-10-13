@@ -23,6 +23,7 @@
 #ifndef mac_version
 #include <omp.h>
 #endif
+#ifdef Q_JSON_SUPPORT
 #include "qstring.h"
 #include "QDebug"
 #include <iostream>
@@ -32,6 +33,7 @@
 #include "Vector.h"
 #include "parameter_set.h"
 #include "observation.h"
+
 
 
 #ifdef Q_GUI_SUPPORT

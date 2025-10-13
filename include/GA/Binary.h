@@ -17,6 +17,10 @@
 #define BINARY_H
 
 #include <vector>
+#include <cmath>
+#include <stdexcept>
+#include <iostream>
+
 
 using namespace std;
 
@@ -461,8 +465,8 @@ void cross2p(CBinary &B1, CBinary &B2, int p1, int p2)
 void CBinary::show() const
 {
     for (int i = 0; i < nDigits; i++)
-        cout << Digit[i];
-    cout << endl;
+        std::cout << Digit[i];
+    std::cout << endl;
 }
 
 // Mutation
