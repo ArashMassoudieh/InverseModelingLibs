@@ -18,17 +18,13 @@
 
 #include "Individual.h"
 #include "Distribution.h"
-#include <stdio.h>
-#include "TimeSeries.h"
-#include "DistributionNUnif.h"
 #include <cmath>
-#include <iostream>
-#include "Matrix.h"
 #ifndef mac_version
 #include "omp.h"
 #endif
 #include <vector>
 #include <string>
+#include <random>
 
 // Forward declaration for GUI support
 class RunTimeWindow;
@@ -289,7 +285,7 @@ private:
 
     T* Model;                           ///< Pointer to base model
     std::vector<T> Models;              ///< Model copies for parallel evaluation
-    T Model_out;                        ///< Best model output
+    T* Model_out;                        ///< Best model output
 
     std::vector<int> params;            ///< Parameter indices
     std::vector<int> loged;             ///< Log-scale flags (1=log, 0=linear)
@@ -313,6 +309,9 @@ private:
     std::vector<double> fixedinputvale;
     std::vector<bool> apply_to_all;
     std::vector<std::vector<int>> outcompare;
+
+    std::mt19937 randomGenerator;
+    std::uniform_real_distribution<double> uniformDistribution;
 
     /**
      * @brief Initialize GA from model (eliminates constructor duplication)

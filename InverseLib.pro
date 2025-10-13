@@ -10,14 +10,22 @@ INCLUDEPATH += include/GA
 INCLUDEPATH += include/MCMC
 INCLUDEPATH += Utilities
 
+DEFINES += GSL
+
 SOURCES += \
         Utilities/Matrix.cpp \
         Utilities/Matrix_arma.cpp \
+        Utilities/NormalDist.cpp \
         Utilities/Vector.cpp \
         Utilities/Vector_arma.cpp \
         Utilities/QuickSort.cpp \
         Utilities/Utilities.cpp \
+        levenbergmarquardt.hpp \
         main.cpp \
+        observation.cpp \
+        parameter.cpp \
+        parameter_set.cpp \
+        polynomialmodel.cpp \
         src/GA/Binary.cpp \
         src/GA/Distribution.cpp \
         src/GA/DistributionNUnif.cpp \
@@ -29,8 +37,10 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 HEADERS += \
+    NormalDistributionModel.h \
     Utilities/Matrix.h \
     Utilities/Matrix_arma.h \
+    Utilities/NormalDist.h \
     Utilities/QuickSort.h \
     Utilities/TimeSeries.h \
     Utilities/TimeSeries.hpp \
@@ -42,8 +52,19 @@ HEADERS += \
     include/GA/DistributionNUnif.h \
     include/GA/GA.h \
     include/GA/GA.hpp \
-    include/GA/Individual.h
+    include/GA/Individual.h \
+    include/MCMC/MCMC.h \
+    include/MCMC/MCMC.hpp \
+    levenbergmarquardt.h \
+    observation.h \
+    parameter.h \
+    parameter_set.h \
+    polynomialmodel.h
 
+
+QMAKE_CXXFLAGS += -fopenmp
+QMAKE_LFLAGS += -fopenmp
+LIBS += -fopenmp
 
 linux {
     #sudo apt-get install libblas-dev liblapack-dev
