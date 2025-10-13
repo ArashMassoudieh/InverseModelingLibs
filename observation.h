@@ -82,6 +82,20 @@ public:
      * @brief Set observation name
      * @param name New observation name
      */
+
+    /**
+     * @brief Copy constructor
+     * @param other Observation to copy from
+     */
+    Observation(const Observation& other);
+
+    /**
+     * @brief Copy assignment operator
+     * @param other Observation to copy from
+     * @return Reference to this object
+     */
+    Observation& operator=(const Observation& other);
+
     void SetName(const std::string& name);
 
     // ========================================================================
@@ -209,16 +223,79 @@ public:
      */
     const TimeSeriesSet<double>& GetPercentile95() const;
 
+
+    // ========================================================================
+    // Location and Quantity Accessors
+    // ========================================================================
+
+    /**
+     * @brief Get location identifier
+     * @return Location name (e.g., well name, monitoring station)
+     */
+    const std::string& GetLocation() const;
+
+    /**
+     * @brief Set location identifier
+     * @param location Location name
+     */
+    void SetLocation(const std::string& location);
+
+    /**
+     * @brief Get quantity being observed
+     * @return Quantity name (e.g., tracer name, temperature)
+     */
+    const std::string& GetQuantity() const;
+
+    /**
+     * @brief Set quantity being observed
+     * @param quantity Quantity name
+     */
+    void SetQuantity(const std::string& quantity);
+
+    /**
+     * @brief Get std deviation parameter name
+     * @return Parameter name
+     */
+    const std::string& GetStdParameterName() const;
+
+    /**
+     * @brief Set std deviation parameter name
+     * @param name Parameter name
+     */
+    void SetStdParameterName(const std::string& name);
+
+    /**
+     * @brief Get error standard deviation
+     * @return Standard deviation value
+     */
+    double GetErrorStdDev() const;
+
+    /**
+     * @brief Set error standard deviation
+     * @param std_dev Standard deviation value
+     */
+    void SetErrorStdDev(double std_dev);
+private:
+    // ========================================================================
+    // Private Data Members
+    // ========================================================================
+
 private:
     // ========================================================================
     // Private Data Members
     // ========================================================================
 
     std::string obsName;                    ///< Observation identifier
+    std::string location_;                  ///< Location identifier (e.g., well name, sensor ID)
+    std::string quantity_;                  ///< Quantity being observed (e.g., tracer name, temperature)
+    std::string stdParameterName_;          ///< Name of std deviation parameter
     TimeSeries<double> observedData;        ///< Measured/observed data
     TimeSeries<double> modeledData;         ///< Model predictions
     TimeSeriesSet<double> realizations;     ///< Ensemble realizations
     TimeSeriesSet<double> percentile95;     ///< Prediction intervals
+    double errorStdDev_;                    ///< Error standard deviation value
+
+
 };
 
 #endif // OBSERVATION_H

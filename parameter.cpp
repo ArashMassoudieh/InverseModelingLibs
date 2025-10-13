@@ -160,6 +160,14 @@ void Parameter::SetRange(const Range& r) {
     range = r;
 }
 
+void Parameter::SetLow(const double& r) {
+    range.low = r;
+}
+
+void Parameter::SetHigh(const double& r) {
+    range.high = r;
+}
+
 void Parameter::SetPriorDistribution(const std::string& dist) {
     priorDistribution = dist;
 }
@@ -167,4 +175,43 @@ void Parameter::SetPriorDistribution(const std::string& dist) {
 void Parameter::SetPriorParameters(double mean, double std) {
     priorMean = mean;
     priorStd = std;
+}
+
+// ============================================================================
+// Location/Quantity Getters
+// ============================================================================
+
+const std::vector<std::string>& Parameter::GetLocations() const {
+    return locations_;
+}
+
+const std::vector<std::string>& Parameter::GetQuantities() const {
+    return quantities_;
+}
+
+const std::vector<std::string>& Parameter::GetLocationTypes() const {
+    return locationTypes_;
+}
+
+// ============================================================================
+// Location/Quantity Setters
+// ============================================================================
+
+void Parameter::SetLocations(const std::vector<std::string>& locs) {
+    locations_ = locs;
+}
+
+void Parameter::SetQuantities(const std::vector<std::string>& quants) {
+    quantities_ = quants;
+}
+
+void Parameter::SetLocationTypes(const std::vector<std::string>& types) {
+    locationTypes_ = types;
+}
+
+void Parameter::AddLocation(const std::string& location, const std::string& quantity,
+                            const std::string& type) {
+    locations_.push_back(location);
+    quantities_.push_back(quantity);
+    locationTypes_.push_back(type);
 }

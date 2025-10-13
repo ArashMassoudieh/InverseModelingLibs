@@ -22,13 +22,42 @@
 // ============================================================================
 
 Observation::Observation()
-    : obsName("")
+    : obsName(""), errorStdDev_(0.0)
 {
 }
 
 Observation::Observation(const std::string& name)
-    : obsName(name)
+    : obsName(name), errorStdDev_(0.0)
 {
+}
+
+Observation::Observation(const Observation& other)
+    : obsName(other.obsName)
+    , location_(other.location_)
+    , quantity_(other.quantity_)
+    , stdParameterName_(other.stdParameterName_)
+    , errorStdDev_(other.errorStdDev_)
+    , observedData(other.observedData)
+    , modeledData(other.modeledData)
+    , realizations(other.realizations)
+    , percentile95(other.percentile95)
+{
+}
+
+Observation& Observation::operator=(const Observation& other)
+{
+    if (this != &other) {
+        obsName = other.obsName;
+        location_ = other.location_;
+        quantity_ = other.quantity_;
+        stdParameterName_ = other.stdParameterName_;
+        errorStdDev_ = other.errorStdDev_;
+        observedData = other.observedData;
+        modeledData = other.modeledData;
+        realizations = other.realizations;
+        percentile95 = other.percentile95;
+    }
+    return *this;
 }
 
 // ============================================================================
@@ -222,4 +251,40 @@ const TimeSeriesSet<double>& Observation::GetRealizations() const {
 
 const TimeSeriesSet<double>& Observation::GetPercentile95() const {
     return percentile95;
+}
+
+// ============================================================================
+// Location and Quantity Accessors
+// ============================================================================
+
+const std::string& Observation::GetLocation() const {
+    return location_;
+}
+
+void Observation::SetLocation(const std::string& location) {
+    location_ = location;
+}
+
+const std::string& Observation::GetQuantity() const {
+    return quantity_;
+}
+
+void Observation::SetQuantity(const std::string& quantity) {
+    quantity_ = quantity;
+}
+
+const std::string& Observation::GetStdParameterName() const {
+    return stdParameterName_;
+}
+
+void Observation::SetStdParameterName(const std::string& name) {
+    stdParameterName_ = name;
+}
+
+double Observation::GetErrorStdDev() const {
+    return errorStdDev_;
+}
+
+void Observation::SetErrorStdDev(double std_dev) {
+    errorStdDev_ = std_dev;
 }

@@ -127,6 +127,54 @@ public:
      */
     void SetRange(const Range& r);
 
+    void SetLow(const double& r);
+    void SetHigh(const double& r);
+
+    /**
+     * @brief Get locations this parameter applies to
+     * @return Vector of location names (wells or tracers)
+     */
+    const std::vector<std::string>& GetLocations() const;
+
+    /**
+     * @brief Get quantities this parameter represents at each location
+     * @return Vector of quantity names
+     */
+    const std::vector<std::string>& GetQuantities() const;
+
+    /**
+     * @brief Get location types
+     * @return Vector of location type identifiers
+     */
+    const std::vector<std::string>& GetLocationTypes() const;
+
+    /**
+     * @brief Set locations this parameter applies to
+     * @param locs Vector of location names
+     */
+    void SetLocations(const std::vector<std::string>& locs);
+
+    /**
+     * @brief Set quantities this parameter represents
+     * @param quants Vector of quantity names
+     */
+    void SetQuantities(const std::vector<std::string>& quants);
+
+    /**
+     * @brief Set location types
+     * @param types Vector of location types
+     */
+    void SetLocationTypes(const std::vector<std::string>& types);
+
+    /**
+     * @brief Add a single location-quantity-type mapping
+     * @param location Location name
+     * @param quantity Quantity name
+     * @param type Location type
+     */
+    void AddLocation(const std::string& location, const std::string& quantity,
+                     const std::string& type);
+
     /**
      * @brief Set prior distribution type
      * @param dist Distribution name ("uniform", "normal", "log-normal")
@@ -222,6 +270,10 @@ private:
     TimeSeriesSet<double> mcmcSamples;  ///< MCMC chain samples
     TimeSeries<double> posteriorDist;   ///< Posterior distribution
     TimeSeriesSet<double> percentile95; ///< Credible intervals
+
+    std::vector<std::string> locations_;      ///< Locations this parameter applies to
+    std::vector<std::string> quantities_;     ///< Quantities at each location
+    std::vector<std::string> locationTypes_;  ///< Location types (e.g., "well", "tracer")
 };
 
 #endif // PARAMETER_H
