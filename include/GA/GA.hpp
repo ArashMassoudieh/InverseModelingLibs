@@ -620,9 +620,9 @@ void CGA<T>::assignfitnesses()
         Models.push_back(*Model);
 
         // Configure the model
-        Models[k].SetSilent(true);
-        Models[k].SetRecordResults(false);
-        Models[k].SetNumThreads(1);
+        //Models[k].SetSilent(true);
+        //Models[k].SetRecordResults(false);
+        //Models[k].SetNumThreads(1);
 
         // Apply parameters to model
         for (int i = 0; i < GA_params.nParam; i++)
@@ -687,7 +687,7 @@ void CGA<T>::assignfitnesses()
 #endif
 
         // Get fitness value
-        Ind[k].actual_fitness = Models[k].GetObjectiveFunctionValue();
+        Ind[k].actual_fitness = -Models[k].GetObjectiveFunctionValue();
 
         // Handle failed simulations
         if (Models[k].GetSolutionFailed())
@@ -758,7 +758,7 @@ void CGA<T>::assignfitnesses()
                     size_t baseIdx = obsIdx * 3;
                     if (baseIdx + 2 < Ind[k].fit_measures.size())
                     {
-                        Ind[k].fit_measures[baseIdx]     = obs->CalculateSSE();  // MSE
+                        Ind[k].fit_measures[baseIdx]     = obs->CalculateRMSE();  // MSE
                         Ind[k].fit_measures[baseIdx + 1] = obs->CalculateR2();   // R²
                         Ind[k].fit_measures[baseIdx + 2] = obs->CalculateNSE();  // NSE
                     }
@@ -1548,8 +1548,17 @@ int CGA<T>::optimize()
     // ========================================================================
 
     write_to_detailed_GA("Initializing population...");
+#ifndef Q_GUI_SUPPORT
+    std::cout << "Initializing population..." << std::endl;
+#endif
     initialize();
     write_to_detailed_GA("Population initialized.");
+#ifndef Q_GUI_SUPPORT
+    std::cout << "Population initialized." << std::endl;
+    std::cout << "Starting optimization for " << GA_params.nGen << " generations..." << std::endl;
+    std::cout << "Population size: " << GA_params.maxpop << std::endl;
+    std::cout << std::string(60, '-') << std::endl;
+#endif
 
     // ========================================================================
     // Step 3: Setup Adaptive Parameters
@@ -1671,6 +1680,16 @@ int CGA<T>::optimize()
             rtw->Replot();
             QCoreApplication::processEvents();
         }
+#else
+        // Console progress output
+        const double progress = 100.0 * static_cast<double>(current_generation + 1) /
+                                static_cast<double>(GA_params.nGen);
+        std::cout << "Generation " << std::setw(4) << current_generation
+                  << " | Progress: " << std::fixed << std::setprecision(1) << std::setw(5) << progress << "% "
+                  << "| Best Fitness: " << std::scientific << std::setprecision(4)
+                  << Ind[bestIndex].actual_fitness
+                  << " | Shake Scale: " << std::scientific << std::setprecision(2)
+                  << GA_params.shakescale << std::endl;
 #endif
 
         // --------------------------------------------------------------------
@@ -1690,6 +1709,11 @@ int CGA<T>::optimize()
             if (isStagnant && shakeScaleAboveMinimum)
             {
                 GA_params.shakescale *= GA_params.shakescalered;
+#ifndef Q_GUI_SUPPORT
+                std::cout << "  -> Fitness stagnant, reducing shake scale to "
+                          << std::scientific << std::setprecision(2)
+                          << GA_params.shakescale << std::endl;
+#endif
             }
 
             // Increase shake scale if improving
@@ -1703,6 +1727,11 @@ int CGA<T>::optimize()
             if (isImproving && shakeScaleBelowInitial)
             {
                 GA_params.shakescale /= GA_params.shakescalered;
+#ifndef Q_GUI_SUPPORT
+                std::cout << "  -> Fitness improving, increasing shake scale to "
+                          << std::scientific << std::setprecision(2)
+                          << GA_params.shakescale << std::endl;
+#endif
             }
 
             GA_params.numenhancements = 0;
@@ -1719,12 +1748,20 @@ int CGA<T>::optimize()
                 {
                     GA_params.numenhancements = static_cast<int>(initialEnhancements);
                 }
+#ifndef Q_GUI_SUPPORT
+                std::cout << "  -> Long-term stagnation detected, adjusting enhancements to "
+                          << GA_params.numenhancements << std::endl;
+#endif
             }
 
             if (fitnessHistory[current_generation][0] ==
                 fitnessHistory[current_generation - 50][0])
             {
                 GA_params.numenhancements = static_cast<int>(initialEnhancements * 10);
+#ifndef Q_GUI_SUPPORT
+                std::cout << "  -> Extended stagnation detected, increasing enhancements to "
+                          << GA_params.numenhancements << std::endl;
+#endif
             }
         }
 
@@ -1738,6 +1775,11 @@ int CGA<T>::optimize()
             if (GA_params.shakescale == fitnessHistory[current_generation - 20][1])
             {
                 GA_params.shakescale = initialShakeScale;
+#ifndef Q_GUI_SUPPORT
+                std::cout << "  -> Resetting shake scale to initial value: "
+                          << std::scientific << std::setprecision(2)
+                          << initialShakeScale << std::endl;
+#endif
             }
         }
 
@@ -1778,6 +1820,12 @@ int CGA<T>::optimize()
     // ========================================================================
     // Step 5: Final Evaluation and Results
     // ========================================================================
+
+#ifndef Q_GUI_SUPPORT
+    std::cout << std::string(60, '-') << std::endl;
+    std::cout << "Optimization complete!" << std::endl;
+    std::cout << "Performing final fitness evaluation..." << std::endl;
+#endif
 
     write_to_detailed_GA("Performing final fitness evaluation...");
     write_to_detailed_GA("Performing final fitness evaluation...");
@@ -1833,6 +1881,10 @@ int CGA<T>::optimize()
         rtw->SetProgress(1.0);
         QCoreApplication::processEvents();
     }
+#else
+    std::cout << "Final best fitness: " << std::scientific << std::setprecision(6)
+              << MaxFitness << std::endl;
+    std::cout << "Results written to: " << runFileName << std::endl;
 #endif
 
     // Clean up
@@ -1842,6 +1894,8 @@ int CGA<T>::optimize()
 
     return maxfitness();
 }
+
+
 
 template<class T>
 double CGA<T>::assignfitnesses(const std::vector<double>& parameters)
