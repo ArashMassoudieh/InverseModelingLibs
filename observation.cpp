@@ -22,12 +22,24 @@
 // ============================================================================
 
 Observation::Observation()
-    : obsName(""), errorStdDev_(0.0)
+    : obsName("")
+    , errorStdDev_(0.0)
+    , errorStructure_("normal")
+    , hasDetectionLimit_(false)
+    , detectionLimitValue_(0.0)
+    , countMax_(false)
+    , maxDataCount_(1)
 {
 }
 
 Observation::Observation(const std::string& name)
-    : obsName(name), errorStdDev_(0.0)
+    : obsName(name)
+    , errorStdDev_(0.0)
+    , errorStructure_("normal")
+    , hasDetectionLimit_(false)
+    , detectionLimitValue_(0.0)
+    , countMax_(false)
+    , maxDataCount_(1)
 {
 }
 
@@ -37,6 +49,11 @@ Observation::Observation(const Observation& other)
     , quantity_(other.quantity_)
     , stdParameterName_(other.stdParameterName_)
     , errorStdDev_(other.errorStdDev_)
+    , errorStructure_(other.errorStructure_)
+    , hasDetectionLimit_(other.hasDetectionLimit_)
+    , detectionLimitValue_(other.detectionLimitValue_)
+    , countMax_(other.countMax_)
+    , maxDataCount_(other.maxDataCount_)
     , observedData(other.observedData)
     , modeledData(other.modeledData)
     , realizations(other.realizations)
@@ -52,6 +69,11 @@ Observation& Observation::operator=(const Observation& other)
         quantity_ = other.quantity_;
         stdParameterName_ = other.stdParameterName_;
         errorStdDev_ = other.errorStdDev_;
+        errorStructure_ = other.errorStructure_;
+        hasDetectionLimit_ = other.hasDetectionLimit_;
+        detectionLimitValue_ = other.detectionLimitValue_;
+        countMax_ = other.countMax_;
+        maxDataCount_ = other.maxDataCount_;
         observedData = other.observedData;
         modeledData = other.modeledData;
         realizations = other.realizations;
@@ -287,4 +309,45 @@ double Observation::GetErrorStdDev() const {
 
 void Observation::SetErrorStdDev(double std_dev) {
     errorStdDev_ = std_dev;
+}
+
+
+std::string Observation::GetErrorStructure() const {
+    return errorStructure_;
+}
+
+void Observation::SetErrorStructure(const std::string& structure) {
+    errorStructure_ = structure;
+}
+
+bool Observation::HasDetectionLimit() const {
+    return hasDetectionLimit_;
+}
+
+void Observation::SetHasDetectionLimit(bool hasLimit) {
+    hasDetectionLimit_ = hasLimit;
+}
+
+double Observation::GetDetectionLimitValue() const {
+    return detectionLimitValue_;
+}
+
+void Observation::SetDetectionLimitValue(double value) {
+    detectionLimitValue_ = value;
+}
+
+bool Observation::GetCountMax() const {
+    return countMax_;
+}
+
+void Observation::SetCountMax(bool countMax) {
+    countMax_ = countMax;
+}
+
+int Observation::GetMaxDataCount() const {
+    return maxDataCount_;
+}
+
+void Observation::SetMaxDataCount(int count) {
+    maxDataCount_ = count;
 }

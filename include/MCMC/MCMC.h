@@ -20,7 +20,6 @@
 #include <string>
 #include "math.h"
 #include <iostream>
-#include "NormalDist.h"
 #include "GA.h"
 #include "Vector.h"
 #include "Matrix_arma.h"

@@ -275,10 +275,70 @@ public:
      * @param std_dev Standard deviation value
      */
     void SetErrorStdDev(double std_dev);
-private:
+
     // ========================================================================
-    // Private Data Members
+    // Error Structure and Detection Limits
     // ========================================================================
+
+    /**
+     * @brief Get error structure type
+     * @return 0=normal, 1=log-normal
+     */
+    std::string GetErrorStructure() const;
+
+    /**
+     * @brief Set error structure type
+     * @param structure 0=normal, 1=log-normal
+     */
+    void SetErrorStructure(const std::string &structure);
+
+    /**
+     * @brief Check if detection limit applies
+     * @return true if detection limit is enabled
+     */
+    bool HasDetectionLimit() const;
+
+    /**
+     * @brief Set detection limit flag
+     * @param hasLimit true to enable detection limit
+     */
+    void SetHasDetectionLimit(bool hasLimit);
+
+    /**
+     * @brief Get detection limit value
+     * @return Detection limit value
+     */
+    double GetDetectionLimitValue() const;
+
+    /**
+     * @brief Set detection limit value
+     * @param value Detection limit value
+     */
+    void SetDetectionLimitValue(double value);
+
+    /**
+     * @brief Check if count normalization is enabled
+     * @return true if normalizing by max count
+     */
+    bool GetCountMax() const;
+
+    /**
+     * @brief Set count normalization flag
+     * @param countMax true to enable normalization
+     */
+    void SetCountMax(bool countMax);
+
+    /**
+     * @brief Get max data count
+     * @return Maximum data count
+     */
+    int GetMaxDataCount() const;
+
+    /**
+     * @brief Set max data count
+     * @param count Maximum data count
+     */
+    void SetMaxDataCount(int count);
 
 private:
     // ========================================================================
@@ -294,6 +354,12 @@ private:
     TimeSeriesSet<double> realizations;     ///< Ensemble realizations
     TimeSeriesSet<double> percentile95;     ///< Prediction intervals
     double errorStdDev_;                    ///< Error standard deviation value
+
+    std::string errorStructure_;            ///< Error structure: normal, log-normal
+    bool hasDetectionLimit_;                ///< Whether detection limit applies
+    double detectionLimitValue_;            ///< Detection limit value
+    bool countMax_;                         ///< Whether to normalize by max count
+    int maxDataCount_;                      ///< Max data points among all observables at same location
 
 
 };
