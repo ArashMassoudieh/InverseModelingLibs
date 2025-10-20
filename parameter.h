@@ -254,6 +254,25 @@ public:
      */
     void SetPercentile95(const TimeSeriesSet<double>& pct);
 
+    /**
+ * @brief Remove a specific location/quantity/type combination
+ * @param location Location name to remove
+ * @param quantity Quantity associated with this location
+ * @param locationType Type of location (e.g., "well", "tracer", "0", "1")
+ * @return true if found and removed, false otherwise
+ */
+    bool RemoveLocation(const std::string& location,
+                        const std::string& quantity,
+                        const std::string& locationType);
+
+    /**
+ * @brief Remove all occurrences of a location with specific type
+ * @param location Location name to remove
+ * @param locationType Type of location to match
+ * @return Number of entries removed
+ */
+    int RemoveAllLocations(const std::string& location,
+                           const std::string& locationType);
 private:
     // ========================================================================
     // Private Data Members

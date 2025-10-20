@@ -206,20 +206,11 @@ TimeSeriesSet<double> CMCMC<T>::RunModel(const std::vector<double>& par)
     // Create a copy of the model
     T modelCopy = *model;
 
-    // Configure for efficient evaluation
-    modelCopy.SetSilent(true);
-    modelCopy.SetRecordResults(false);
-    modelCopy.SetNumThreads(1);
-
     // Set parameter values
     for (unsigned int i = 0; i < settings.number_of_parameters; ++i)
     {
         modelCopy.SetParameterValue(i, par[i]);
     }
-
-    // Apply parameters and solve
-    modelCopy.ApplyParameters();
-    modelCopy.Solve();
 
     // Return predictions at observation times
     return modelCopy.GetPredictions();
@@ -508,11 +499,6 @@ double CMCMC<T>::CalculateLogPosterior(const std::vector<double>& par,
     // Create a copy of the model
     T modelCopy = *model;
 
-    // Configure for efficient evaluation
-    modelCopy.SetSilent(true);
-    modelCopy.SetRecordResults(false);
-    modelCopy.SetNumThreads(1);
-
     // Calculate log prior probability and set parameter values
     double logPrior = 0.0;
     for (unsigned int i = 0; i < settings.number_of_parameters; ++i)
@@ -525,9 +511,6 @@ double CMCMC<T>::CalculateLogPosterior(const std::vector<double>& par,
         }
     }
 
-    // Apply parameters to model
-    modelCopy.ApplyParameters();
-
     // Log start of simulation (thread-safe)
 #pragma omp critical
     {
@@ -538,16 +521,13 @@ double CMCMC<T>::CalculateLogPosterior(const std::vector<double>& par,
         }
     }
 
-    // Run model simulation
-    modelCopy.Solve();
-
     // Get objective function value (negative log likelihood)
     double objectiveFunctionValue = modelCopy.GetObjectiveFunctionValue();
 
     // Calculate log likelihood
     // Assuming objective function is sum of squared errors (SSE)
     // log likelihood ∝ -SSE/2, but we can use -SSE for simplicity
-    double logLikelihood = -objectiveFunctionValue;
+    double logLikelihood = objectiveFunctionValue;
 
     // Log completion (thread-safe)
 #pragma omp critical
@@ -1217,6 +1197,7 @@ bool CMCMC<T>::PerformSteps(int k, int numSamples, const std::string& filename,
     // Constants for periodic operations
     const int WRITE_INTERVAL = 50;  // Write to file every N*chains samples
     const int ADAPT_INTERVAL = 50;  // Adapt perturbation every N*chains samples
+    const int CONSOLE_UPDATE_INTERVAL = 10; // Console output every N*chains samples
 
     // Initialize output file if not continuing
     if (!settings.continue_mcmc)
@@ -1255,6 +1236,22 @@ bool CMCMC<T>::PerformSteps(int k, int numSamples, const std::string& filename,
 
     // Starting index for this run
     int startIndex = k;
+
+#ifndef Q_GUI_SUPPORT
+    // Print header for console output
+    std::cout << "\n=== MCMC Sampling Progress ===" << std::endl;
+    std::cout << "Total samples: " << numSamples << std::endl;
+    std::cout << "Number of chains: " << settings.number_of_chains << std::endl;
+    std::cout << "Target acceptance rate: " << settings.acceptance_rate << std::endl;
+    std::cout << std::string(80, '-') << std::endl;
+    std::cout << std::setw(10) << "Sample"
+              << std::setw(15) << "Progress"
+              << std::setw(15) << "Accept Rate"
+              << std::setw(15) << "Log Post"
+              << std::setw(15) << "Perturb"
+              << std::endl;
+    std::cout << std::string(80, '-') << std::endl;
+#endif
 
     // Main sampling loop - process chains in parallel
     for (unsigned int kk = k;
@@ -1354,6 +1351,39 @@ bool CMCMC<T>::PerformSteps(int k, int numSamples, const std::string& filename,
         // Process GUI events
 #ifdef Q_GUI_SUPPORT
         QCoreApplication::processEvents();
+#endif
+
+        // Console output (when GUI not available)
+#ifndef Q_GUI_SUPPORT
+        if ((kk - startIndex) % (CONSOLE_UPDATE_INTERVAL * settings.number_of_chains) == 0)
+        {
+            double progress = static_cast<double>(kk - startIndex) / static_cast<double>(numSamples) * 100.0;
+            double currentAcceptanceRate = (totalCount > 0) ?
+                                               static_cast<double>(acceptedCount) / static_cast<double>(totalCount) : 0.0;
+            double avgLogPost = 0.0;
+            int countValid = 0;
+
+            // Calculate average log posterior for recent samples
+            for (int jj = std::max(0, static_cast<int>(kk) - 10); jj < static_cast<int>(kk); ++jj)
+            {
+                if (jj < static_cast<int>(logPosterior.size()) && !std::isnan(logPosterior[jj]))
+                {
+                    avgLogPost += logPosterior[jj];
+                    countValid++;
+                }
+            }
+            avgLogPost = (countValid > 0) ? avgLogPost / countValid : 0.0;
+
+            double perturbRatio = (initialPerturbation > 0) ?
+                                      perturbationCoefficients[0] / initialPerturbation : 1.0;
+
+            std::cout << std::setw(10) << kk
+                      << std::setw(14) << std::fixed << std::setprecision(1) << progress << "%"
+                      << std::setw(15) << std::fixed << std::setprecision(3) << currentAcceptanceRate
+                      << std::setw(15) << std::scientific << std::setprecision(2) << avgLogPost
+                      << std::setw(15) << std::fixed << std::setprecision(4) << perturbRatio
+                      << std::endl;
+        }
 #endif
 
         // Periodic file output
@@ -1466,6 +1496,15 @@ bool CMCMC<T>::PerformSteps(int k, int numSamples, const std::string& filename,
         }
 #endif
     }
+
+#ifndef Q_GUI_SUPPORT
+    std::cout << std::string(80, '-') << std::endl;
+    std::cout << "MCMC sampling completed!" << std::endl;
+    std::cout << "Final acceptance rate: "
+              << std::fixed << std::setprecision(3)
+              << ((totalCount > 0) ? static_cast<double>(acceptedCount) / static_cast<double>(totalCount) : 0.0)
+              << std::endl << std::endl;
+#endif
 
     return true;
 }
@@ -2205,12 +2244,6 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
                 {
                     modelCopy.SetParameterValue(i, sampledParameters[i]);
                 }
-
-                // Apply parameters and run model
-                modelCopy.ApplyParameters();
-                modelCopy.SetSilent(true);
-                modelCopy.SetRecordResults(true);  // Need results for observations
-                modelCopy.Solve();
 
                 // Extract results from THIS model copy's observations
                 std::vector<Observation>* modelObservations = modelCopy.Observations();

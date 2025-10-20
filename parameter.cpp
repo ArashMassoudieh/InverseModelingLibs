@@ -215,3 +215,55 @@ void Parameter::AddLocation(const std::string& location, const std::string& quan
     quantities_.push_back(quantity);
     locationTypes_.push_back(type);
 }
+
+bool Parameter::RemoveLocation(const std::string& location,
+                               const std::string& quantity,
+                               const std::string& locationType)
+{
+    // Find matching entry
+    for (size_t i = 0; i < locations_.size(); ++i) {
+        bool locationMatch = (locations_[i] == location);
+        bool quantityMatch = (i < quantities_.size() && quantities_[i] == quantity);
+        bool typeMatch = (i < locationTypes_.size() && locationTypes_[i] == locationType);
+
+        if (locationMatch && quantityMatch && typeMatch) {
+            // Remove this entry
+            locations_.erase(locations_.begin() + i);
+            if (i < quantities_.size()) {
+                quantities_.erase(quantities_.begin() + i);
+            }
+            if (i < locationTypes_.size()) {
+                locationTypes_.erase(locationTypes_.begin() + i);
+            }
+            return true;
+        }
+    }
+
+    return false;  // Not found
+}
+
+int Parameter::RemoveAllLocations(const std::string& location,
+                                  const std::string& locationType)
+{
+    int removedCount = 0;
+
+    // Iterate backwards to safely remove elements
+    for (int i = locations_.size() - 1; i >= 0; --i) {
+        bool locationMatch = (locations_[i] == location);
+        bool typeMatch = (static_cast<size_t>(i) < locationTypes_.size() &&
+                          locationTypes_[i] == locationType);
+
+        if (locationMatch && typeMatch) {
+            locations_.erase(locations_.begin() + i);
+            if (static_cast<size_t>(i) < quantities_.size()) {
+                quantities_.erase(quantities_.begin() + i);
+            }
+            if (static_cast<size_t>(i) < locationTypes_.size()) {
+                locationTypes_.erase(locationTypes_.begin() + i);
+            }
+            removedCount++;
+        }
+    }
+
+    return removedCount;
+}
