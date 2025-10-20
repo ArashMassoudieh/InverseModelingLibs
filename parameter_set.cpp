@@ -135,3 +135,24 @@ const Parameter* Parameter_Set::operator[](const std::string& name) const {
     }
     return nullptr;  // Not found
 }
+
+bool Parameter_Set::RemoveParameter(int index)
+{
+    if (index < 0 || index >= static_cast<int>(parameters.size())) {
+        return false;
+    }
+
+    parameters.erase(parameters.begin() + index);
+    return true;
+}
+
+bool Parameter_Set::RemoveParameter(const std::string& name)
+{
+    for (int i = 0; i < static_cast<int>(parameters.size()); ++i) {
+        if (parameters[i].GetName() == name) {
+            parameters.erase(parameters.begin() + i);
+            return true;
+        }
+    }
+    return false;  // Not found
+}

@@ -196,6 +196,20 @@ public:
      */
     const Parameter* operator[](const std::string& name) const;
 
+    /**
+ * @brief Remove a parameter by index
+ * @param index Index of parameter to remove
+ * @return true if successful, false if index out of range
+ */
+    bool RemoveParameter(int index);
+
+    /**
+ * @brief Remove a parameter by name
+ * @param name Name of parameter to remove
+ * @return true if found and removed, false otherwise
+ */
+    bool RemoveParameter(const std::string& name);
+
 private:
     // ========================================================================
     // Private Data Members
