@@ -27,7 +27,7 @@
 #include <random>
 
 // Forward declaration for GUI support
-class RunTimeWindow;
+class ProgressWindow;
 
 /**
  * @struct GAParameters
@@ -255,11 +255,47 @@ public:
 
 #ifdef Q_GUI_SUPPORT
     /**
-     * @brief Set runtime window for progress visualization
-     * @param _rtw Pointer to runtime window
+     * @brief Set progress window for visualization
+     * @param _pw Pointer to progress window
      */
-    void SetRunTimeWindow(RunTimeWindow* _rtw) { rtw = _rtw; }
+    void SetProgressWindow(ProgressWindow* _pw) { progressWindow = _pw; }
+
+    /**
+ * @brief Get number of generations
+ * @return Number of generations
+ */
+    int getNumGenerations() const { return GA_params.nGen; }
+    double getCrossoverProb() const { return GA_params.pcross; }
+    double getMutationProb() const { return GA_params.pmute; }
+    double getShakeScale() const { return GA_params.shakescale; }
+    double getShakeScaleRed() const { return GA_params.shakescalered; }
+    int getNumThreads() const { return numberOfThreads; }
+    int getCrossoverType() const { return GA_params.cross_over_type; }
+    bool isRCGA() const { return GA_params.RCGA; }
+    double getFitnessExponent() const { return GA_params.N; }
+    int getNumEnhancements() const { return GA_params.numenhancements; }
 #endif
+
+     /* Extracts parameters from model, sets up parameter ranges (handling log-scale
+     * parameters), creates and initializes population, and sets up fitness distribution.
+     * This method is called by both model-based constructors to avoid code duplication.
+     *
+     * Steps performed:
+     * 1. Extract all parameters from model
+     * 2. Determine if each parameter uses log or linear scale
+     * 3. Set min/max ranges (converting to log10 if needed)
+     * 4. Create population with correct size
+     * 5. Allocate fit_measures vectors based on observation count
+     * 6. Set parameter ranges for all individuals
+     * 7. Initialize fitness distribution
+     */
+        void initFromModel(T* model);
+
+    /**
+     * @brief Get the best model after optimization
+     * @return Pointer to best model (nullptr if optimization hasn't run)
+     */
+    T* getBestModel() const { return Model_out; }
 
 private:
     // ========================================================================
@@ -316,24 +352,11 @@ private:
     /**
      * @brief Initialize GA from model (eliminates constructor duplication)
      * @param model Pointer to model instance
-     *
-     * Extracts parameters from model, sets up parameter ranges (handling log-scale
-     * parameters), creates and initializes population, and sets up fitness distribution.
-     * This method is called by both model-based constructors to avoid code duplication.
-     *
-     * Steps performed:
-     * 1. Extract all parameters from model
-     * 2. Determine if each parameter uses log or linear scale
-     * 3. Set min/max ranges (converting to log10 if needed)
-     * 4. Create population with correct size
-     * 5. Allocate fit_measures vectors based on observation count
-     * 6. Set parameter ranges for all individuals
-     * 7. Initialize fitness distribution
-     */
-        void initFromModel(T* model);
+     **/
+
 
 #ifdef Q_GUI_SUPPORT
-    RunTimeWindow* rtw;                 ///< Runtime window for progress display
+    ProgressWindow* progressWindow;     ///< Progress window for visualization
 #endif
 
     // ========================================================================

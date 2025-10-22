@@ -39,7 +39,7 @@
 
 
 #ifdef Q_GUI_SUPPORT
-    #include "runtimewindow.h"
+    #include "ProgressWindow.h"
 #endif
 
 /**
@@ -61,7 +61,7 @@ CGA<T>::CGA()
     , randomGenerator(std::random_device{}())  // Seed with random device
     , uniformDistribution(0.0, 1.0)            // Uniform distribution [0, 1]
 #ifdef Q_GUI_SUPPORT
-    , rtw(nullptr)
+    , progressWindow(nullptr)
 #endif
 {
     GA_params.maxpop = 100;
@@ -188,7 +188,7 @@ CGA<T>::CGA(const std::string& filename, const T& model)
     , MaxFitness(0.0)
     , sumfitness(0.0)
 #ifdef Q_GUI_SUPPORT
-    , rtw(nullptr)
+    , progressWindow(nullptr)
 #endif
 {
     // Set default GA parameters
@@ -264,7 +264,7 @@ CGA<T>::CGA(T* model)
     , randomGenerator(std::random_device{}())  // Seed with random device
     , uniformDistribution(0.0, 1.0)            // Uniform distribution [0, 1]
 #ifdef Q_GUI_SUPPORT
-    , rtw(nullptr)
+    , progressWindow(nullptr)
 #endif
 {
     // Set default GA parameters
@@ -384,7 +384,7 @@ CGA<T>::CGA(const CGA<T>& C)
     , apply_to_all(C.apply_to_all)
     , outcompare(C.outcompare)
 #ifdef Q_GUI_SUPPORT
-    , rtw(nullptr) // Don't copy GUI pointer
+    , progressWindow(nullptr) // Don't copy GUI pointer
 #endif
 {
     // Models vector is not copied (would be expensive and usually not needed)
@@ -791,13 +791,13 @@ void CGA<T>::assignfitnesses()
 
 #ifdef Q_GUI_SUPPORT
             // Update GUI progress bar
-            if (rtw != nullptr)
+            if (progressWindow != nullptr)
             {
 #ifndef NO_OPENMP
                 if (omp_get_thread_num() == 0)
 #endif
                 {
-                    rtw->SetProgress2(static_cast<double>(completedEvaluations) /
+                    progressWindow->setSecondaryProgress(static_cast<double>(completedEvaluations) /
                                       static_cast<double>(GA_params.maxpop));
                     QCoreApplication::processEvents();
                 }
@@ -831,9 +831,9 @@ void CGA<T>::assignfitnesses()
     Model_out = new T(Models[bestIndex]);
 
 #ifdef Q_GUI_SUPPORT
-    if (rtw != nullptr)
+    if (progressWindow != nullptr)
     {
-        rtw->SetProgress2(1.0);
+        progressWindow->setSecondaryProgress(1.0);
         QCoreApplication::processEvents();
     }
 #endif
@@ -1668,16 +1668,35 @@ int CGA<T>::optimize()
         fitnessHistory[current_generation][0] = Ind[bestIndex].actual_fitness;
 
 #ifdef Q_GUI_SUPPORT
-        if (rtw)
+        if (progressWindow)
         {
-            if (current_generation == 0)
-            {
-                rtw->SetYRange(0, Ind[bestIndex].actual_fitness * 1.1);
+            // Update progress bar
+            progressWindow->setProgress(static_cast<double>(current_generation) /
+                                        static_cast<double>(GA_params.nGen));
+
+            // Update status
+            progressWindow->setStatus(QString("Generation %1 of %2")
+                                          .arg(current_generation + 1)
+                                          .arg(GA_params.nGen));
+
+            // Add fitness point to chart
+            progressWindow->addFitnessPoint(current_generation, Ind[bestIndex].actual_fitness);
+
+            // Log every 10 generations
+            if (current_generation % 10 == 0 || current_generation == 0) {
+                progressWindow->appendLog(QString("Gen %1: Best fitness = %2, Shake scale = %3")
+                                              .arg(current_generation)
+                                              .arg(Ind[bestIndex].actual_fitness, 0, 'e', 4)
+                                              .arg(GA_params.shakescale, 0, 'e', 2));
             }
-            rtw->SetProgress(static_cast<double>(current_generation) /
-                             static_cast<double>(GA_params.nGen));
-            rtw->AddDataPoint(current_generation + 1, Ind[bestIndex].actual_fitness);
-            rtw->Replot();
+
+            // Check for cancel
+            if (progressWindow->isCancelRequested()) {
+                progressWindow->appendLog("Optimization cancelled by user");
+                progressWindow->setComplete("Cancelled");
+                break;
+            }
+
             QCoreApplication::processEvents();
         }
 #else
@@ -1876,18 +1895,21 @@ int CGA<T>::optimize()
     assignfitnesses(final_params);
 
 #ifdef Q_GUI_SUPPORT
-    if (rtw)
+    if (progressWindow)
     {
-        rtw->SetProgress(1.0);
-        QCoreApplication::processEvents();
+        progressWindow->appendLog(QString("Population size: %1").arg(GA_params.maxpop));
+        progressWindow->appendLog(QString("Number of generations: %1").arg(GA_params.nGen));
+        progressWindow->appendLog(QString("Number of parameters: %1").arg(GA_params.nParam));
+        progressWindow->appendLog("Parameters being optimized:");
+        for (const auto& name : paramname) {
+            progressWindow->appendLog(QString("  - %1").arg(QString::fromStdString(name)));
+        }
+        progressWindow->appendLog("");
+        progressWindow->setStatus("Starting optimization...");
     }
-#else
-    std::cout << "Final best fitness: " << std::scientific << std::setprecision(6)
-              << MaxFitness << std::endl;
-    std::cout << "Results written to: " << runFileName << std::endl;
 #endif
 
-    // Clean up
+    Model_out = new T(Models[maxfitness()]);
     Models.clear();
 
     write_to_detailed_GA("Optimization complete!");
@@ -2584,7 +2606,7 @@ void CGA<T>::getinitialpop(const std::string& filename)
         {
             try
             {
-                individual[j] = aquiutils::ATOF(line);
+                individual = aquiutils::ATOF(line);
             }
             catch (...)
             {

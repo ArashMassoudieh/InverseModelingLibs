@@ -31,7 +31,7 @@ class ParameterSet;
 using namespace std;
 
 // Forward declarations
-class RunTimeWindow;
+class ProgressWindow;
 class Parameter_Set;
 class Parameter;
 
@@ -211,7 +211,7 @@ public:
      * @brief Set the runtime window for progress updates
      * @param _rtw Pointer to runtime window (can be nullptr)
      */
-    void SetRunTimeWindow(RunTimeWindow *_rtw);
+    void SetRunTimeWindow(ProgressWindow *_rtw);
 
     // ============================================================================
     // Initialization
@@ -446,7 +446,7 @@ private:
      * and GUI updates if runtime window provided.
      */
     bool PerformSteps(int k, int numSamples, const std::string& filename,
-                      RunTimeWindow* runtimeWindow = nullptr);
+                      ProgressWindow* runtimeWindow = nullptr);
 
     /**
      * @brief Perturb parameters to generate proposal
@@ -550,7 +550,7 @@ private:
 
     // Utilities
     CNormalDist normalDistribution;          ///< Random number generator
-    RunTimeWindow* runtimeWindow;            ///< Optional GUI window
+    ProgressWindow* runtimeWindow;            ///< Optional GUI window
     string last_error;                       ///< Last error message
 
     // Legacy compatibility data
