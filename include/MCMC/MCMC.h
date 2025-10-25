@@ -141,9 +141,8 @@ public:
      */
     ~CMCMC();
 
-    // Copy constructor and assignment operator deleted to prevent issues with pointers
-    CMCMC(const CMCMC&) = delete;
-    CMCMC& operator=(const CMCMC&) = delete;
+    CMCMC(const CMCMC&);
+    CMCMC& operator=(const CMCMC&);
 
     // ============================================================================
     // Configuration
@@ -217,14 +216,22 @@ public:
     // Initialization
     // ============================================================================
 
-    /**
-     * @brief Initialize MCMC chains with random or nominal parameters
-     * @param random If true, randomize initial parameters within prior ranges
+     /* This method:
+     * 1. Clears the detail log file
+     * 2. Allocates storage for all samples
+     * 3. Calculates perturbation coefficients based on parameter ranges
+     * 4. Initializes starting values for each chain (random or current)
+     * 5. Evaluates initial log posterior for each chain
      *
-     * Sets up parameter vectors, perturbation coefficients, and evaluates
-     * initial posterior probabilities for all chains.
+     * For random initialization:
+     * - Uniform/normal parameters: sampled uniformly from [low, high]
+     * - Log-normal parameters: sampled uniformly in log-space
+     *
+     * For non-random initialization:
+     * - All chains start from current parameter values
      */
-    void initialize(bool random = false);
+
+    void Initialize(bool random);
 
     /**
      * @brief Initialize MCMC chains from specific parameter values
@@ -497,22 +504,7 @@ private:
      * @brief Initialize MCMC chains
      * @param random If true, initialize parameters randomly; if false, use current values
      *
-     * This method:
-     * 1. Clears the detail log file
-     * 2. Allocates storage for all samples
-     * 3. Calculates perturbation coefficients based on parameter ranges
-     * 4. Initializes starting values for each chain (random or current)
-     * 5. Evaluates initial log posterior for each chain
-     *
-     * For random initialization:
-     * - Uniform/normal parameters: sampled uniformly from [low, high]
-     * - Log-normal parameters: sampled uniformly in log-space
-     *
-     * For non-random initialization:
-     * - All chains start from current parameter values
-     */
 
-    void Initialize(bool random);
 
     // ============================================================================
     // Private Helper Methods

@@ -92,6 +92,58 @@ CMCMC<T>::~CMCMC()
 }
 
 /**
+ * @brief Copy constructor
+ */
+template<class T>
+CMCMC<T>::CMCMC(const CMCMC& other)
+    : model(other.model)
+    , modelOutput(other.modelOutput)
+    , parameters(other.parameters)
+    , observations(other.observations)
+    , settings(other.settings)
+    , fileInformation(other.fileInformation)
+    , parameterIndices(other.parameterIndices)
+    , perturbationCoefficients(other.perturbationCoefficients)
+    , applyToAll(other.applyToAll)
+    , acceptedCount(0.0)
+    , totalCount(0.0)
+    , normalDistribution()
+    , runtimeWindow(nullptr)
+    , last_error()
+{
+}
+
+/**
+ * @brief Copy assignment operator
+ */
+template<class T>
+CMCMC<T>& CMCMC<T>::operator=(const CMCMC& other)
+{
+    if (this != &other) {
+        model = other.model;
+        modelOutput = other.modelOutput;
+        parameters = other.parameters;
+        observations = other.observations;
+        settings = other.settings;
+        fileInformation = other.fileInformation;
+        parameterIndices = other.parameterIndices;
+        perturbationCoefficients = other.perturbationCoefficients;
+        applyToAll = other.applyToAll;
+
+        parameterSamples.clear();
+        logPosterior.clear();
+        logPosteriorTransformed.clear();
+        uniformRandoms.clear();
+        acceptedCount = 0.0;
+        totalCount = 0.0;
+
+        runtimeWindow = nullptr;
+        last_error.clear();
+    }
+    return *this;
+}
+
+/**
  * @brief Constructor with model pointer
  * @param system Pointer to the model to be calibrated (must not be null)
  *
@@ -423,6 +475,11 @@ bool CMCMC<T>::SetProperty(const std::string& varname, const std::string& value)
 
     if (lowerVarname == "add_noise_to_realizations") {
         settings.noise_realization_writeout = (aquiutils::tolower(value) == "yes");
+        return true;
+    }
+
+    if (lowerVarname == "perturbation_factor") {
+        settings.perturbation_factor = aquiutils::atof(value);
         return true;
     }
 
@@ -1262,7 +1319,7 @@ bool CMCMC<T>::PerformSteps(int k, int numSamples, const std::string& filename,
         QCoreApplication::processEvents();
 
         // Check if user requested stop
-        if (runtimeWindow && runtimeWindow->isCancelRequested())
+        if (runtimeWindow && runtimeWindow->IsCancelRequested())
         {
             break;
         }
@@ -1458,20 +1515,20 @@ bool CMCMC<T>::PerformSteps(int k, int numSamples, const std::string& filename,
         {
             // Update progress bar
             double progress = static_cast<double>(kk - startIndex) / static_cast<double>(numSamples);
-            runtimeWindow->setProgress(progress);
+            runtimeWindow->SetProgress(progress);
 
             // Plot acceptance rate
             if (totalCount > 0)
             {
                 double currentAcceptanceRate = static_cast<double>(acceptedCount) / static_cast<double>(totalCount);
-                runtimeWindow->addMCMCPoint(kk, currentAcceptanceRate);
+                runtimeWindow->AddSecondaryChartPoint(kk, currentAcceptanceRate);
             }
 
             // Plot perturbation scaling (if plot2 enabled)
             if (initialPerturbation > 0)
             {
                 double perturbationRatio = perturbationCoefficients[0] / initialPerturbation;
-                runtimeWindow->addFitnessPoint(kk, perturbationRatio);
+                runtimeWindow->AddPrimaryChartPoint(kk, perturbationRatio);
             }
 
 
@@ -2149,7 +2206,7 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
 #ifdef Q_GUI_SUPPORT
     if (runtimeWindow)
     {
-        runtimeWindow->appendLog("Generating "
+        runtimeWindow->AppendLog("Generating "
                                   + QString::number(settings.number_of_post_estimate_realizations)
                                   + " realizations...");
     }
@@ -2185,7 +2242,6 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
         // Configure OpenMP threading
 #ifndef NO_OPENMP
         omp_set_num_threads(numThreads);
-#endif
 
         // Seed random number generator for each thread
 #pragma omp parallel
@@ -2198,6 +2254,7 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
 
         // Run models in parallel
 #pragma omp parallel for
+#endif
         for (int j = 0; j < static_cast<int>(batchSize); ++j)
         {
             try
@@ -2278,15 +2335,15 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
         {
             double progress = static_cast<double>(batchStart + batchSize)
             / static_cast<double>(numRealizations);
-            runtimeWindow->setProgress(progress);
+            runtimeWindow->SetProgress(progress);
 
             // Keep GUI responsive
             QCoreApplication::processEvents();
 
             // Check if user cancelled
-            if (runtimeWindow->isCancelRequested())
+            if (runtimeWindow->IsCancelRequested())
             {
-                runtimeWindow->appendLog("Realization generation stopped by user");
+                runtimeWindow->AppendLog("Realization generation stopped by user");
                 return;
             }
         }
@@ -2382,8 +2439,8 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
 #ifdef Q_GUI_SUPPORT
     if (runtimeWindow)
     {
-        runtimeWindow->setProgress(1.0);
-        runtimeWindow->appendLog("Realizations complete. Generated "
+        runtimeWindow->SetProgress(1.0);
+        runtimeWindow->AppendLog("Realizations complete. Generated "
                                   + QString::number(numRealizations) + " realizations for "
                                   + QString::number(observations->size()) + " observations.");
     }
@@ -2490,7 +2547,7 @@ TimeSeriesSet<double> CMCMC<T>::GetOutputPercentiles(TimeSeriesSet<double>& MCMC
 #ifdef Q_GUI_SUPPORT
     if (runtimeWindow)
     {
-        runtimeWindow->appendLog("Calculating output percentiles...");
+        runtimeWindow->AppendLog("Calculating output percentiles...");
     }
 #endif
 
@@ -2577,7 +2634,7 @@ TimeSeriesSet<double> CMCMC<T>::GetOutputPercentiles(TimeSeriesSet<double>& MCMC
             }
         }
 
-        runtimeWindow->appendLog(summary);
+        runtimeWindow->AppendLog(summary);
     }
 #endif
 
@@ -2675,7 +2732,7 @@ void CMCMC<T>::Perform()
 #ifdef Q_GUI_SUPPORT
     if (runtimeWindow)
     {
-        runtimeWindow->appendLog("Initializing MCMC chains...");
+        runtimeWindow->AppendLog("Initializing MCMC chains...");
     }
 #endif
 
@@ -2702,7 +2759,7 @@ void CMCMC<T>::Perform()
 #ifdef Q_GUI_SUPPORT
         if (runtimeWindow)
         {
-            runtimeWindow->appendLog("Reading samples from " + QString::fromStdString(settings.continue_filename));
+            runtimeWindow->AppendLog("Reading samples from " + QString::fromStdString(settings.continue_filename));
         }
 #endif
 
@@ -2729,7 +2786,7 @@ void CMCMC<T>::Perform()
 #ifdef Q_GUI_SUPPORT
     if (runtimeWindow)
     {
-        runtimeWindow->appendLog("Generating MCMC samples...");
+        runtimeWindow->AppendLog("Generating MCMC samples...");
     }
 #endif
 
@@ -2751,7 +2808,7 @@ void CMCMC<T>::Perform()
 #ifdef Q_GUI_SUPPORT
         if (runtimeWindow)
         {
-            runtimeWindow->appendLog("MCMC sampling stopped by user");
+            runtimeWindow->AppendLog("MCMC sampling stopped by user");
         }
 #endif
         std::cout << "MCMC sampling stopped" << std::endl;
@@ -2765,7 +2822,7 @@ void CMCMC<T>::Perform()
 #ifdef Q_GUI_SUPPORT
     if (runtimeWindow)
     {
-        runtimeWindow->appendLog("Creating posterior distributions...");
+        runtimeWindow->AppendLog("Creating posterior distributions...");
     }
 #endif
 
@@ -2875,7 +2932,7 @@ void CMCMC<T>::Perform()
 #ifdef Q_GUI_SUPPORT
         if (runtimeWindow)
         {
-            runtimeWindow->appendLog("Generating model realizations...");
+            runtimeWindow->AppendLog("Generating model realizations...");
         }
 #endif
 
@@ -2905,8 +2962,8 @@ void CMCMC<T>::Perform()
         summary += "Parameters estimated: " + std::to_string(parameters->size()) + "\n";
         summary += "Observations used: " + std::to_string(observations->size());
 
-        runtimeWindow->appendLog(summary);
-        runtimeWindow->setProgress(1.0);
+        runtimeWindow->AppendLog(summary);
+        runtimeWindow->SetProgress(1.0);
     }
 #endif
 

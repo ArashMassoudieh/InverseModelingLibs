@@ -797,7 +797,7 @@ void CGA<T>::assignfitnesses()
                 if (omp_get_thread_num() == 0)
 #endif
                 {
-                    progressWindow->setSecondaryProgress(static_cast<double>(completedEvaluations) /
+                    progressWindow->SetSecondaryProgress(static_cast<double>(completedEvaluations) /
                                       static_cast<double>(GA_params.maxpop));
                     QCoreApplication::processEvents();
                 }
@@ -833,7 +833,7 @@ void CGA<T>::assignfitnesses()
 #ifdef Q_GUI_SUPPORT
     if (progressWindow != nullptr)
     {
-        progressWindow->setSecondaryProgress(1.0);
+        progressWindow->SetSecondaryProgress(1.0);
         QCoreApplication::processEvents();
     }
 #endif
@@ -1671,29 +1671,29 @@ int CGA<T>::optimize()
         if (progressWindow)
         {
             // Update progress bar
-            progressWindow->setProgress(static_cast<double>(current_generation) /
+            progressWindow->SetProgress(static_cast<double>(current_generation) /
                                         static_cast<double>(GA_params.nGen));
 
             // Update status
-            progressWindow->setStatus(QString("Generation %1 of %2")
+            progressWindow->SetStatus(QString("Generation %1 of %2")
                                           .arg(current_generation + 1)
                                           .arg(GA_params.nGen));
 
             // Add fitness point to chart
-            progressWindow->addFitnessPoint(current_generation, Ind[bestIndex].actual_fitness);
+            progressWindow->AddPrimaryChartPoint(current_generation, Ind[bestIndex].actual_fitness);
 
             // Log every 10 generations
             if (current_generation % 10 == 0 || current_generation == 0) {
-                progressWindow->appendLog(QString("Gen %1: Best fitness = %2, Shake scale = %3")
+                progressWindow->AppendLog(QString("Gen %1: Best fitness = %2, Shake scale = %3")
                                               .arg(current_generation)
                                               .arg(Ind[bestIndex].actual_fitness, 0, 'e', 4)
                                               .arg(GA_params.shakescale, 0, 'e', 2));
             }
 
             // Check for cancel
-            if (progressWindow->isCancelRequested()) {
-                progressWindow->appendLog("Optimization cancelled by user");
-                progressWindow->setComplete("Cancelled");
+            if (progressWindow->IsCancelRequested()) {
+                progressWindow->AppendLog("Optimization cancelled by user");
+                progressWindow->SetComplete("Cancelled");
                 break;
             }
 
@@ -1897,15 +1897,15 @@ int CGA<T>::optimize()
 #ifdef Q_GUI_SUPPORT
     if (progressWindow)
     {
-        progressWindow->appendLog(QString("Population size: %1").arg(GA_params.maxpop));
-        progressWindow->appendLog(QString("Number of generations: %1").arg(GA_params.nGen));
-        progressWindow->appendLog(QString("Number of parameters: %1").arg(GA_params.nParam));
-        progressWindow->appendLog("Parameters being optimized:");
+        progressWindow->AppendLog(QString("Population size: %1").arg(GA_params.maxpop));
+        progressWindow->AppendLog(QString("Number of generations: %1").arg(GA_params.nGen));
+        progressWindow->AppendLog(QString("Number of parameters: %1").arg(GA_params.nParam));
+        progressWindow->AppendLog("Parameters being optimized:");
         for (const auto& name : paramname) {
-            progressWindow->appendLog(QString("  - %1").arg(QString::fromStdString(name)));
+            progressWindow->AppendLog(QString("  - %1").arg(QString::fromStdString(name)));
         }
-        progressWindow->appendLog("");
-        progressWindow->setStatus("Starting optimization...");
+        progressWindow->AppendLog("");
+        progressWindow->SetStatus("Starting optimization...");
     }
 #endif
 
