@@ -52,9 +52,15 @@ Parameter::Parameter(const std::string& name, double low, double high,
 
     // For normal/log-normal, set mean and std based on range
     // Assumes 95% of distribution is within [low, high]
-    if (dist == "normal" || dist == "log-normal") {
+    if (dist == "normal") {
+        // For normal distribution: use arithmetic mean and linear std
         priorMean = (low + high) / 2.0;
         priorStd = (high - low) / 4.0;  // ±2σ covers ~95% of normal distribution
+    }
+    else if (dist == "log-normal") {
+        // For log-normal distribution: use geometric mean and log-space std
+        priorMean = std::sqrt(low * high);  // Geometric mean
+        priorStd = (std::log(high) - std::log(low)) / 4.0;  // Log-space std (±2σ in log-space)
     }
     else {
         priorMean = 0.0;
@@ -267,3 +273,5 @@ int Parameter::RemoveAllLocations(const std::string& location,
 
     return removedCount;
 }
+
+

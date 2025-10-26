@@ -226,6 +226,21 @@ public:
      */
     double CalcLogPriorProbability(double val) const;
 
+    /**
+    * @brief Get the prior mean
+    * @return Prior mean value
+    */
+    double GetPriorMean() const { return priorMean; }
+
+    /**
+     * @brief Get the prior standard deviation
+     * @return Prior standard deviation
+     */
+    double GetPriorStd() const { return priorStd; }
+
+    void SetPriorMean(double mean) { priorMean = mean; }
+    void SetPriorStd(double std) { priorStd = std; }
+
     // ========================================================================
     // MCMC Post-Processing Storage
     // ========================================================================
@@ -273,6 +288,42 @@ public:
  */
     int RemoveAllLocations(const std::string& location,
                            const std::string& locationType);
+
+    /**
+ * @brief Get MCMC samples
+ * @return TimeSeriesSet containing MCMC chain samples
+ */
+    const TimeSeriesSet<double>& GetMCMCSamples() const { return mcmcSamples; }
+
+    /**
+ * @brief Get posterior distribution
+ * @return TimeSeries representing posterior density
+ */
+    const TimeSeries<double>& GetPosteriorDistribution() const { return posteriorDist; }
+
+    /**
+ * @brief Get 95% credible interval
+ * @return TimeSeriesSet containing percentile information
+ */
+    const TimeSeriesSet<double>& GetPercentile95() const { return percentile95; }
+
+    /**
+ * @brief Check if MCMC samples are available
+ * @return true if samples exist
+ */
+    bool hasMCMCSamples() const { return mcmcSamples.size() > 0; }
+
+    /**
+ * @brief Check if posterior distribution is available
+ * @return true if posterior exists
+ */
+    bool hasPosteriorDistribution() const { return posteriorDist.size() > 0; }
+
+    /**
+ * @brief Check if percentiles are available
+ * @return true if percentiles exist
+ */
+    bool hasPercentiles() const { return percentile95.size() > 0; }
 private:
     // ========================================================================
     // Private Data Members

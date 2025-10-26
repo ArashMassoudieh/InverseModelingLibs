@@ -819,7 +819,7 @@ void CMCMC<T>::Initialize(bool random)
                     parameterSamples[j][i] = std::exp(logValue);
 
                     // Accumulate Jacobian for transformation
-                    logJacobian += std::log(parameterSamples[j][i]);
+                    logJacobian += 0*std::log(parameterSamples[j][i]);
                 }
                 else
                 {
@@ -852,7 +852,7 @@ void CMCMC<T>::Initialize(bool random)
                 // Accumulate Jacobian for log-normal parameters
                 if (param->GetPriorDistribution() == "log-normal")
                 {
-                    logJacobian += std::log(parameterSamples[j][i]);
+                    logJacobian += 0*std::log(parameterSamples[j][i]);
                 }
             }
 
@@ -1030,7 +1030,7 @@ void CMCMC<T>::InitializeFromParameters(const std::vector<double>& par)
                                                            * normalDistribution.getnormalrand(0, perturbationCoefficients[i]));
 
                 // Accumulate Jacobian for log-normal transformation
-                logJacobian += std::log(par[i]);
+                logJacobian += 0*std::log(par[i]);
             }
         }
 
@@ -1081,7 +1081,7 @@ bool CMCMC<T>::PerformStep(int k)
         Parameter* param = GetParameter(i);
         if (param && param->GetPriorDistribution() == "log-normal")
         {
-            logJacobian += std::log(proposal[i]);
+            logJacobian += 0*std::log(proposal[i]);
         }
     }
 
@@ -1097,13 +1097,89 @@ bool CMCMC<T>::PerformStep(int k)
         std::ofstream detailFile(fileInformation.detailfilename, std::ios::app);
         if (detailFile.is_open())
         {
-            detailFile << "Sample #" << k
-                       << " proposal_log_posterior: " << proposalLogPosterior
-                       << ", previous_log_posterior: " << previousLogPosterior << "\n";
+            detailFile << "Sample #" << k << "\n";
+
+            // Write parameter values for both proposal and previous
+            detailFile << "  Proposal params: ";
+            for (unsigned int i = 0; i < proposal.size(); ++i)
+            {
+                Parameter* param = GetParameter(i);
+                if (param) {
+                    detailFile << param->GetName() << "=" << proposal[i];
+                } else {
+                    detailFile << "param_" << i << "=" << proposal[i];
+                }
+                if (i < proposal.size() - 1) detailFile << ", ";
+            }
+            detailFile << "\n";
+
+            detailFile << "  Previous params: ";
+            for (unsigned int i = 0; i < parameterSamples[previousIndex].size(); ++i)
+            {
+                Parameter* param = GetParameter(i);
+                if (param) {
+                    detailFile << param->GetName() << "=" << parameterSamples[previousIndex][i];
+                } else {
+                    detailFile << "param_" << i << "=" << parameterSamples[previousIndex][i];
+                }
+                if (i < parameterSamples[previousIndex].size() - 1) detailFile << ", ";
+            }
+            detailFile << "\n";
+
+            // Write prior breakdown for proposal
+            detailFile << "  Proposal priors:\n";
+            for (unsigned int i = 0; i < proposal.size(); ++i)
+            {
+                Parameter* param = GetParameter(i);
+                if (param) {
+                    double priorValue = param->CalcLogPriorProbability(proposal[i]);
+                    detailFile << "    " << param->GetName()
+                               << ": value=" << proposal[i]
+                               << ", prior=" << priorValue
+                               << ", priorMean=" << param->GetPriorMean()
+                               << ", priorStd=" << param->GetPriorStd()
+                               << ", dist=" << param->GetPriorDistribution() << "\n";
+                }
+            }
+
+            // Write prior breakdown for previous
+            detailFile << "  Previous priors:\n";
+            for (unsigned int i = 0; i < parameterSamples[previousIndex].size(); ++i)
+            {
+                Parameter* param = GetParameter(i);
+                if (param) {
+                    double priorValue = param->CalcLogPriorProbability(parameterSamples[previousIndex][i]);
+                    detailFile << "    " << param->GetName()
+                               << ": value=" << parameterSamples[previousIndex][i]
+                               << ", prior=" << priorValue
+                               << ", priorMean=" << param->GetPriorMean()
+                               << ", priorStd=" << param->GetPriorStd()
+                               << ", dist=" << param->GetPriorDistribution() << "\n";
+                }
+            }
+
+            // Calculate and write Jacobian
+            detailFile << "  Jacobian (proposal): " << logJacobian << "\n";
+
+            double logJacobianPrevious = 0.0;
+            for (unsigned int i = 0; i < settings.number_of_parameters; ++i)
+            {
+                Parameter* param = GetParameter(i);
+                if (param && param->GetPriorDistribution() == "log-normal")
+                {
+                    logJacobianPrevious += 0*std::log(parameterSamples[previousIndex][i]);
+                }
+            }
+            detailFile << "  Jacobian (previous): " << logJacobianPrevious << "\n";
+
+            // Write log posterior values
+            detailFile << "  Proposal log_posterior (with Jacobian): " << proposalLogPosterior << "\n";
+            detailFile << "  Previous log_posterior (with Jacobian): " << previousLogPosterior << "\n";
+            detailFile << "  Log acceptance ratio: " << (proposalLogPosterior - previousLogPosterior) << "\n";
+
             detailFile.close();
         }
     }
-
     // Metropolis-Hastings acceptance test
     bool accepted = false;
 
@@ -1488,18 +1564,18 @@ bool CMCMC<T>::PerformSteps(int k, int numSamples, const std::string& filename,
 
                 if (currentAcceptanceRate > settings.acceptance_rate)
                 {
-                    // Acceptance rate too high - increase perturbation
+                    // Acceptance rate too high - increase perturbation to explore more
                     for (unsigned int i = 0; i < settings.number_of_parameters; ++i)
                     {
-                        perturbationCoefficients[i] /= settings.perturbation_change_scale;
+                        perturbationCoefficients[i] /= settings.perturbation_change_scale;  // MULTIPLY to increase
                     }
                 }
                 else
                 {
-                    // Acceptance rate too low - decrease perturbation
+                    // Acceptance rate too low - decrease perturbation to improve acceptance
                     for (unsigned int i = 0; i < settings.number_of_parameters; ++i)
                     {
-                        perturbationCoefficients[i] *= settings.perturbation_change_scale;
+                        perturbationCoefficients[i] *= settings.perturbation_change_scale;  // DIVIDE to decrease
                     }
                 }
 
