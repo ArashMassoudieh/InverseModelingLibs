@@ -547,6 +547,7 @@ private:
 
     // Legacy compatibility data
     TimeSeriesSet<double> measuredData;      ///< Measured data storage
+    bool jacobian_Multiplier = 0;
 };
 
 #include "MCMC.hpp"

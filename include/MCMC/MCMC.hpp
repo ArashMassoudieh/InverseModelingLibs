@@ -568,6 +568,7 @@ double CMCMC<T>::CalculateLogPosterior(const std::vector<double>& par,
     }
 
     // Log start of simulation (thread-safe)
+#ifdef _debug
 #pragma omp critical
     {
         std::ofstream detailFile(fileInformation.detailfilename, std::ios::app);
@@ -576,6 +577,7 @@ double CMCMC<T>::CalculateLogPosterior(const std::vector<double>& par,
             detailFile.close();
         }
     }
+#endif
 
     // Get objective function value (negative log likelihood)
     double objectiveFunctionValue = modelCopy.GetObjectiveFunctionValue();
@@ -586,6 +588,7 @@ double CMCMC<T>::CalculateLogPosterior(const std::vector<double>& par,
     double logLikelihood = objectiveFunctionValue;
 
     // Log completion (thread-safe)
+#ifdef _debug
 #pragma omp critical
     {
         std::ofstream detailFile(fileInformation.detailfilename, std::ios::app);
@@ -598,7 +601,7 @@ double CMCMC<T>::CalculateLogPosterior(const std::vector<double>& par,
             detailFile.close();
         }
     }
-
+#endif
     // Save output if requested
     if (saveOutput) {
         modelOutput = modelCopy;
@@ -819,7 +822,7 @@ void CMCMC<T>::Initialize(bool random)
                     parameterSamples[j][i] = std::exp(logValue);
 
                     // Accumulate Jacobian for transformation
-                    logJacobian += 0*std::log(parameterSamples[j][i]);
+                    logJacobian += jacobian_Multiplier*std::log(parameterSamples[j][i]);
                 }
                 else
                 {
@@ -852,7 +855,7 @@ void CMCMC<T>::Initialize(bool random)
                 // Accumulate Jacobian for log-normal parameters
                 if (param->GetPriorDistribution() == "log-normal")
                 {
-                    logJacobian += 0*std::log(parameterSamples[j][i]);
+                    logJacobian += jacobian_Multiplier*std::log(parameterSamples[j][i]);
                 }
             }
 
@@ -1030,7 +1033,7 @@ void CMCMC<T>::InitializeFromParameters(const std::vector<double>& par)
                                                            * normalDistribution.getnormalrand(0, perturbationCoefficients[i]));
 
                 // Accumulate Jacobian for log-normal transformation
-                logJacobian += 0*std::log(par[i]);
+                logJacobian += jacobian_Multiplier*std::log(par[i]);
             }
         }
 
@@ -1081,7 +1084,7 @@ bool CMCMC<T>::PerformStep(int k)
         Parameter* param = GetParameter(i);
         if (param && param->GetPriorDistribution() == "log-normal")
         {
-            logJacobian += 0*std::log(proposal[i]);
+            logJacobian += jacobian_Multiplier*std::log(proposal[i]);
         }
     }
 
@@ -1092,6 +1095,7 @@ bool CMCMC<T>::PerformStep(int k)
     double previousLogPosterior = logPosterior[previousIndex];
 
     // Log proposal evaluation (thread-safe)
+#ifdef _debug
 #pragma omp critical
     {
         std::ofstream detailFile(fileInformation.detailfilename, std::ios::app);
@@ -1167,7 +1171,7 @@ bool CMCMC<T>::PerformStep(int k)
                 Parameter* param = GetParameter(i);
                 if (param && param->GetPriorDistribution() == "log-normal")
                 {
-                    logJacobianPrevious += 0*std::log(parameterSamples[previousIndex][i]);
+                    logJacobianPrevious += jacobian_Multiplier*std::log(parameterSamples[previousIndex][i]);
                 }
             }
             detailFile << "  Jacobian (previous): " << logJacobianPrevious << "\n";
@@ -1180,6 +1184,7 @@ bool CMCMC<T>::PerformStep(int k)
             detailFile.close();
         }
     }
+#endif
     // Metropolis-Hastings acceptance test
     bool accepted = false;
 
@@ -1207,6 +1212,7 @@ bool CMCMC<T>::PerformStep(int k)
         logPosteriorTransformed[k] = proposalLogPosterior;
 
         // Log acceptance (thread-safe)
+#ifdef _debug
 #pragma omp critical
         {
             std::ofstream detailFile(fileInformation.detailfilename, std::ios::app);
@@ -1219,6 +1225,7 @@ bool CMCMC<T>::PerformStep(int k)
                 detailFile.close();
             }
         }
+#endif
     }
     else
     {
@@ -1228,6 +1235,7 @@ bool CMCMC<T>::PerformStep(int k)
         logPosteriorTransformed[k] = proposalLogPosterior;  // Store proposal for diagnostics
 
         // Log rejection (thread-safe)
+#ifdef _debug
 #pragma omp critical
         {
             std::ofstream detailFile(fileInformation.detailfilename, std::ios::app);
@@ -1240,6 +1248,7 @@ bool CMCMC<T>::PerformStep(int k)
                 detailFile.close();
             }
         }
+#endif
     }
 
     return accepted;
@@ -2950,7 +2959,7 @@ void CMCMC<T>::Perform()
 
         // Create discretized posterior distribution (histogram)
         int numBins = std::max(50, static_cast<int>(allSamples.size() / 100));
-        TimeSeries<double> posteriorDistribution = allSamples.distribution(numBins, 0);
+        TimeSeries<double> posteriorDistribution = allSamples.distributionLog(numBins, 0);
         posteriorDistribution.setName("Posterior density");
 
         allPosteriorDistributions.append(posteriorDistribution, param->GetName());
