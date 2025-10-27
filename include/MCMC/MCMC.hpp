@@ -697,7 +697,7 @@ void CMCMC<T>::InitializeFromModel()
     // Set default output path if not set
     if (fileInformation.outputpath.empty())
     {
-        fileInformation.outputpath = model->OutputPath();
+        fileInformation.outputpath = model->OutputPath() + "/";
     }
 
     // Set default output filename if not set
