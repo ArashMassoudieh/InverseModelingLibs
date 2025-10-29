@@ -31,6 +31,11 @@
 #include "parameter_set.h"
 #include "observation.h"
 
+#ifdef GWA
+#include "Well.h"
+#endif // GWA
+
+
 // OpenMP for parallel processing
 #ifndef mac_version
 #include <omp.h>
@@ -65,6 +70,9 @@ CMCMC<T>::CMCMC()
     : model(nullptr)
     , parameters(nullptr)
     , observations(nullptr)
+#ifdef GWA
+    , wells(nullptr)
+#endif // GWA
     , runtimeWindow(nullptr)
     , acceptedCount(0.0)
     , totalCount(0.0)
@@ -100,6 +108,9 @@ CMCMC<T>::CMCMC(const CMCMC& other)
     , modelOutput(other.modelOutput)
     , parameters(other.parameters)
     , observations(other.observations)
+#ifdef GWA
+    , wells(other.wells)
+#endif // GWA
     , settings(other.settings)
     , fileInformation(other.fileInformation)
     , parameterIndices(other.parameterIndices)
@@ -124,6 +135,9 @@ CMCMC<T>& CMCMC<T>::operator=(const CMCMC& other)
         modelOutput = other.modelOutput;
         parameters = other.parameters;
         observations = other.observations;
+#ifdef GWA
+        wells = other.wells;
+#endif // GWA
         settings = other.settings;
         fileInformation = other.fileInformation;
         parameterIndices = other.parameterIndices;
@@ -163,6 +177,9 @@ CMCMC<T>::CMCMC(T* system)
     : model(system)
     , parameters(nullptr)
     , observations(nullptr)
+#ifdef GWA
+    , wells(nullptr)
+#endif // GWA
     , runtimeWindow(nullptr)
     , acceptedCount(0.0)
     , totalCount(0.0)
@@ -222,6 +239,30 @@ Observation* CMCMC<T>::observation(int i)
     // Return pointer to observation
     return &(observations->at(i));
 }
+
+#ifdef GWA
+template<class T>
+CWell* CMCMC<T>::well(int i)
+{
+    // Validate observations pointer
+    if (!wells)
+    {
+        last_error = "observation(): observations pointer is null";
+        return nullptr;
+    }
+
+    // Validate index range
+    if (i < 0 || i >= static_cast<int>(wells->size()))
+    {
+        last_error = "well(): index " + std::to_string(i) + " out of range [0, "
+            + std::to_string(wells->size() - 1) + "]";
+        return nullptr;
+    }
+
+    // Return pointer to observation
+    return &(wells->at(i));
+}
+#endif // GWA
 
 /**
  * @brief Run model with given parameters and return predictions
@@ -381,6 +422,29 @@ Observation* CMCMC<T>::GetObservation(int i)
     return &(observations->at(i));
 }
 
+#ifdef GWA
+template<class T>
+CWell* CMCMC<T>::GetWell(int i)
+{
+    // Validate observations pointer
+    if (!wells)
+    {
+        last_error = "GetWell(): observations pointer is null";
+        return nullptr;
+    }
+
+    // Validate index range
+    if (i < 0 || i >= static_cast<int>(wells->size()))
+    {
+        last_error = "GetWell(): index " + std::to_string(i) + " out of range [0, "
+            + std::to_string(observations->size() - 1) + "]";
+        return nullptr;
+    }
+
+    // Return pointer to observation
+    return &(wells->at(i));
+}
+#endif // GWA
 /**
  * @brief Set a single MCMC configuration property by name
  * @param varname Property name (case-insensitive)
@@ -670,6 +734,10 @@ void CMCMC<T>::InitializeFromModel()
     // Get observations from model
     observations = model->Observations();
 
+#ifdef GWA
+    // Get wells from model
+    wells = model->Wells();
+#endif // GWA
     // Validate we have parameters
     if (!parameters || parameters->empty())
     {
@@ -2266,6 +2334,13 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
         return;
     }
 
+    if (!wells)
+    {
+        last_error = "ProduceRealizations: wells pointer is null";
+        std::cerr << last_error << std::endl;
+        return;
+    }
+
     if (observations->empty())
     {
         last_error = "ProduceRealizations: no observations available";
@@ -2304,6 +2379,11 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
     // Storage for all realizations
     std::vector<TimeSeriesSet<double>> realizedTimeSeries(observations->size());
     std::vector<TimeSeriesSet<double>> predictedPercentiles(observations->size());
+#ifdef GWA
+    std::vector<TimeSeriesSet<double>> realizedTimeSeriesForYoungDistribution(observations->size());
+    std::vector<TimeSeriesSet<double>> predictedPercentilesForYoungDistributions(wells->size());
+#endif // GWA
+
 
     // Calculate number of batches needed
     unsigned int numThreads = settings.numberOfThreads;
@@ -2319,9 +2399,18 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
 
         // Storage for this batch's results
         std::vector<std::vector<TimeSeries<double>>> batchResults(batchSize);
+#ifdef GWA
+        std::vector<std::vector<TimeSeries<double>>> batchResultsYoungDistribution(batchSize);
+#endif // GWA
+
+
         for (unsigned int j = 0; j < batchSize; ++j)
         {
-            batchResults[j].resize(observations->size());
+            batchResults[j].resize(observations->size()); 
+#ifdef GWA
+            batchResultsYoungDistribution[j].resize(wells->size());
+#endif // GWA
+
         }
 
         // Configure OpenMP threading
@@ -2369,9 +2458,12 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
                     modelCopy.SetParameterValue(i, sampledParameters[i]);
                 }
 
+                modelCopy.calculateLogLikelihood();
                 // Extract results from THIS model copy's observations
                 std::vector<Observation>* modelObservations = modelCopy.Observations();
-
+#ifdef GWA
+                std::vector<CWell>* modelWells = modelCopy.Wells();
+#endif // GWA
                 if (!modelObservations || modelObservations->size() != observations->size())
                 {
 #pragma omp critical
@@ -2391,6 +2483,18 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
                         batchResults[j][i] = *(obs.GetModeledTimeSeries());
                     }
                 }
+
+#ifdef GWA
+#endif // GWA
+				// Store results from this realization for young distributions
+				for (unsigned int i = 0; i < modelWells->size(); ++i)
+				{
+					CWell& well = (*modelWells)[i];
+					if (well.getYoungAgeDistribution().size()>0)
+					{
+						batchResultsYoungDistribution[j][i] = well.getYoungAgeDistribution().getcummulative();
+					}
+				}
             }
             catch (const std::exception& e)
             {
@@ -2413,6 +2517,20 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
                 }
             }
         }
+
+#ifdef GWA
+        for (unsigned int j = 0; j < batchSize; ++j)
+        {
+            for (unsigned int i = 0; i < wells->size(); ++i)
+            {
+                if (!batchResultsYoungDistribution[j][i].empty())
+                {
+                    realizedTimeSeriesForYoungDistribution[i].append(batchResultsYoungDistribution[j][i]);
+                }
+            }
+        }
+#endif // GWA
+
 
         // Update progress
 #ifdef Q_GUI_SUPPORT
@@ -2520,6 +2638,78 @@ void CMCMC<T>::ProduceRealizations(TimeSeriesSet<double>& MCMCout)
         }
     }
 
+
+#ifdef GWA
+    // Use percentiles from settings, or default to 2.5%, 50%, 97.5%
+    std::vector<double> percentilesYoungAgeDistribution;
+   
+    // Calculate percentiles and write output files
+    for (unsigned int i = 0; i < wells->size(); ++i)
+    {
+        CWell* thiswell = well(i);
+        if (!thiswell)
+        {
+            std::cerr << "ProduceRealizations: Warning - Well "
+                << i << " is null. Skipping." << std::endl;
+            continue;
+        }
+
+        std::string wellName = thiswell->getName();
+
+        // Check if we have any realizations for this observation
+        if (realizedTimeSeriesForYoungDistribution[i].seriesCount() == 0)
+        {
+            std::cerr << "ProduceRealizations: Warning - No realizations collected for "
+                << wellName << ". Skipping." << std::endl;
+            continue;
+        }
+
+        std::cout << "Writing " << realizedTimeSeriesForYoungDistribution[i].seriesCount()
+            << " realizations for " << wellName << std::endl;
+
+        // Write all realizations
+        std::string realizationsFilename = fileInformation.outputpath
+            + "Realizations_" + wellName + ".txt";
+        try
+        {
+            realizedTimeSeriesForYoungDistribution[i].write(realizationsFilename);
+            std::cout << "  Written to: " << realizationsFilename << std::endl;
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "ProduceRealizations: Error writing realizations for "
+                << wellName << ": " << e.what() << std::endl;
+        }
+
+        // Calculate percentile bands
+        try
+        {
+            predictedPercentilesForYoungDistributions[i] = realizedTimeSeriesForYoungDistribution[i].getpercentiles(percentiles);
+            thiswell->SetPercentile95(predictedPercentilesForYoungDistributions[i]);
+            thiswell->SetRealizations(realizedTimeSeriesForYoungDistribution[i]);
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "ProduceRealizations: Error calculating percentiles for "
+                << wellName << ": " << e.what() << std::endl;
+            continue;
+        }
+
+        // Write percentile bands
+        std::string percentilesFilename = fileInformation.outputpath
+            + "Predicted_95p_Bracket_" + wellName + ".txt";
+        try
+        {
+            predictedPercentiles[i].write(percentilesFilename);
+            std::cout << "  Percentiles written to: " << percentilesFilename << std::endl;
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "ProduceRealizations: Error writing percentiles for "
+                << wellName << ": " << e.what() << std::endl;
+        }
+    }
+#endif // GWA
     // Final progress update
 #ifdef Q_GUI_SUPPORT
     if (runtimeWindow)

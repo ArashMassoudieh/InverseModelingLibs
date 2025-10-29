@@ -27,6 +27,10 @@
 
 class Observation;
 class ParameterSet;
+#ifdef GWA
+class CWell;
+#endif // GWA
+
 
 using namespace std;
 
@@ -207,6 +211,16 @@ public:
     Observation* observation(int i);
 
     /**
+     * @brief Access well by index (legacy)
+     * @param i Well index
+     * @return Pointer to Well object, or nullptr if invalid
+     *
+     * @deprecated Use GetWell(i) instead
+     * @note Provided for backward compatibility
+     */
+    CWell* well(int i);
+
+    /**
      * @brief Set the runtime window for progress updates
      * @param _rtw Pointer to runtime window (can be nullptr)
      */
@@ -313,6 +327,15 @@ public:
      * @return Pointer to Observation object
      */
     Observation* GetObservation(int i);
+
+#ifdef GWA
+    /**
+    * @brief Access well by index
+    * @param i well index
+    * @return Pointer to CWell object
+    */
+    CWell* GetWell(int i);
+#endif // GWA
 
     // ============================================================================
     // File I/O
@@ -526,6 +549,9 @@ private:
     T modelOutput;                           ///< Model copy for output storage
     Parameter_Set* parameters;               ///< Pointer to parameter set
     vector<Observation>* observations;       ///< Pointer to observations
+#ifdef GWA
+    vector<CWell>* wells;                    ///< Pointer to wells
+#endif // GWA
     vector<int> parameterIndices;            ///< Indices of parameters to estimate
 
     // MCMC state
